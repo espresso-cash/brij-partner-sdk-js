@@ -1,9 +1,15 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
-import { encode as base64encode, decode as base64decode } from 'base-64';
 import nacl from 'tweetnacl';
-import { decodeBase58, encodeBase58 } from 'bs58';
+
+// Corrected import for bs58 module
+import base58 from 'bs58';
+const { encode: encodeBase58, decode: decodeBase58 } = base58;
+
+// Corrected import for base-64 module
+import base64 from 'base-64';
+const { encode: base64encode, decode: base64decode } = base64;
 
 class KycPartnerClient {
   constructor({ authKeyPair, baseUrl }) {
@@ -40,9 +46,12 @@ class KycPartnerClient {
       ...await this.authKeyPair.getPrivateKeyBytes(),
       ...decodeBase58(this._authPublicKey),
     ]);
-    
-    this._token = jwt.sign(tokenData, nacl.sign.keyPair.fromSeed(privateKey).secretKey, { algorithm: 'EdDSA','issuer': this._authPublicKey });
-    const instance = axios.create();
+
+    this._token = jwt.sign(tokenData, nacl.sign.keyPair.fromSeed(privateKey).secretKey, { algorithm: 'EdDSA', issuer: this._authPublicKey });
+
+    const instance = axios.create({
+      baseURL: this.baseUrl,
+    });
     instance.interceptors.request.use(config => {
       config.headers['Authorization'] = `Bearer ${this._token}`;
       return config;
@@ -105,10 +114,6 @@ class KycPartnerClient {
 
   async validateField(key, validatedField) {
     // Placeholder: Implementation for validateField
-    // await this.setValidationResult({
-    //   key: key,
-    //   value: await this._hash(validatedField),
-    // });
   }
 
   async _hash(value) {
