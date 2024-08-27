@@ -2,13 +2,10 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypt
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import nacl from 'tweetnacl';
-
-// Corrected import for bs58 module
 import base58 from 'bs58';
-const { encode: encodeBase58, decode: decodeBase58 } = base58;
-
-// Corrected import for base-64 module
 import base64 from 'base-64';
+
+const { encode: encodeBase58, decode: decodeBase58 } = base58;
 const { encode: base64encode, decode: base64decode } = base64;
 
 class KycPartnerClient {
@@ -112,8 +109,16 @@ class KycPartnerClient {
     return new TextDecoder().decode(decrypted);
   }
 
-  async validateField(key, validatedField) {
-    // Placeholder: Implementation for validateField
+  async validateField(value) {
+    const updatedEmail = value.email != null ? await this._hash(value.email) : null;
+    const updatedPhone = value.phone != null ? await this._hash(value.phone) : null;
+
+    const updatedValue = Object.assign({}, value, {
+      email: updatedEmail,
+      phone: updatedPhone,
+    });
+
+    await this.setValidationResult({ value: updatedValue });
   }
 
   async _hash(value) {
