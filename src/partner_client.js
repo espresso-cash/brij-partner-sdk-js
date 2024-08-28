@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypt
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import nacl from 'tweetnacl';
+import { Buffer } from 'buffer';
 import base58 from 'bs58';
 import base64 from 'base-64';
 
@@ -26,16 +27,25 @@ class KycPartnerClient {
       }
 
       async _initializeEncryption(secretKey) {
+            console.log("Secret Key:", secretKey);
             const secretKeyBytes = decodeBase58(secretKey);
             this._secretBox = new SecretBox(Uint8Array.from(secretKeyBytes));
             const authPrivateKey = await this.authKeyPair.getPrivateKeyBytes();
-            this._signingKey = nacl.sign.keyPair.fromSeed(
-                  Uint8Array.from([...authPrivateKey, ...decodeBase58(this._authPublicKey)])
-            );
+
+            console.log("Auth Private Key Length:", authPrivateKey.length);
+            const authPublicKeyBytes = decodeBase58(this._authPublicKey);
+            console.log("Auth Public Key Length:", authPublicKeyBytes.length);
+
+            const seed = authPrivateKey.slice(0, 32);
+            console.log("Seed Length:", seed.length);
+
+            this._signingKey = nacl.sign.keyPair.fromSeed(seed);
       }
 
       async _generateAuthToken(partnerToken) {
             this._authPublicKey = encodeBase58(await this.authKeyPair.getPublicKeyBytes());
+
+            console.log("Public Key (Base58 Encoded):", this._authPublicKey);
 
             // Construct the JWT payload and sign it using EdDSA
             const partnerTokenData = {
@@ -61,11 +71,12 @@ class KycPartnerClient {
                   config.headers['Authorization'] = `Bearer ${this._token}`;
                   return config;
             });
+
             this._apiClient = instance;
       }
 
       async getData({ userPK, secretKey }) {
-            const response = await this._apiClient.get('/kycServiceGetData');
+            const response= await this._apiClient.post('/v1/getData');
             const responseData = response.data;
 
             const verifyKey = nacl.sign.keyPair.fromSeed(decodeBase58(userPK)).publicKey;
@@ -98,11 +109,11 @@ class KycPartnerClient {
       async setValidationResult({ value }) {
             const encryptedValue = value.encryptAndSign(this._encryptAndSign.bind(this));
 
-            await this._apiClient.post('/kycServiceSetValidationResult', { data: encryptedValue });
+            await this._apiClient.post('/v1/setValidationResult', { data: encryptedValue });
       }
 
       async getValidationResult({ key, validatorPK, secretKey }) {
-            const response = await this._apiClient.post('/kycServiceGetValidationResult', {
+            const response = await this._apiClient.post('/v1/getValidationResult', {
                   publicKey: validatorPK,
             });
             const data = response.data[key];

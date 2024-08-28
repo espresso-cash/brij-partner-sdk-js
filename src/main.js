@@ -24,11 +24,16 @@ import base58 from 'bs58';
                               return authKeyPair.publicKey;
                         }
                   },
-                  baseUrl: 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app/'
+                  baseUrl: 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app'
             });
 
             await partnerClient.init({
                   partnerToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3N1ZWRGb3IiOiJISFY1am9CNkQ0YzJwaWdWWmNROVJZNXN1RE12QWlIQkxMQkNGcW1XdU00RSIsImlhdCI6MTcyNDc3MDA2OSwiaXNzIjoiR1dNM2FoMndHUkFYVnhvYjV4d2FBeWhUSDhSeldUZnFhaHFkNVgyODFiYUMifQ.y4i07CWVDoZ1sM15Zb73EH7gNx_MFZpPURX-zOc_bYYw_1lGgL2cIxeLAQSntDcqglFKIQKqxUGRnJyOkCVWDQ",
+                  secretKey: '6xTricdmz1N4VaZeXd9iuMNYHr2KyrjqAdWoY9s6kGL1'
+            });
+
+            await partnerClient.getData({
+                  userPK: '5f8d3c9c1b7b1e2c5e7e5c7d6d5d4c3b2a1a09080706050403020100',
                   secretKey: '6xTricdmz1N4VaZeXd9iuMNYHr2KyrjqAdWoY9s6kGL1'
             });
 
