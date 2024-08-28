@@ -28,13 +28,13 @@ import base58 from 'bs58';
             });
 
             await partnerClient.init({
-                  partnerToken: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3N1ZWRGb3IiOiJISFY1am9CNkQ0YzJwaWdWWmNROVJZNXN1RE12QWlIQkxMQkNGcW1XdU00RSIsImlhdCI6MTcyNDc3MDA2OSwiaXNzIjoiR1dNM2FoMndHUkFYVnhvYjV4d2FBeWhUSDhSeldUZnFhaHFkNVgyODFiYUMifQ.y4i07CWVDoZ1sM15Zb73EH7gNx_MFZpPURX-zOc_bYYw_1lGgL2cIxeLAQSntDcqglFKIQKqxUGRnJyOkCVWDQ",
-                  secretKey: '6ZV86tt5PQ1p584yDnWGpXpGQcdLLWoTAeJC8Jcp5kwo'
+                  partnerToken: "",
+                  secretKey: '8gaVEuztm75uMq11TVRBDUexZmiFeFgCYRTn8ox6QS75'
             });
 
             await partnerClient.getData({
-                  userPK: '9J4eLDHUuW7Kva4cy2S3vJEUvq8GA15Sv1vnEyt5XAXZ',
-                  secretKey: '6ZV86tt5PQ1p584yDnWGpXpGQcdLLWoTAeJC8Jcp5kwo'
+                  userPK: '9XQ8RgeyBuoWs7Sx29X4ZWKatoq5Rd6YQ7ZeqDR7BSJf',
+                  secretKey: '8gaVEuztm75uMq11TVRBDUexZmiFeFgCYRTn8ox6QS75'
             });
 
             console.log('Initialization successful.');

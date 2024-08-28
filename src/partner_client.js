@@ -5,6 +5,7 @@ import nacl from 'tweetnacl';
 import { Buffer } from 'buffer';
 import base58 from 'bs58';
 import base64 from 'base-64';
+import naclUtil from 'tweetnacl-util';
 
 const { encode: encodeBase58, decode: decodeBase58 } = base58;
 const { encode: base64encode, decode: base64decode } = base64;
@@ -57,7 +58,7 @@ class KycPartnerClient {
             //       issuer: this._authPublicKey,
             // };
 
-            this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhZG1pbiI6dHJ1ZSwiaWF0IjoxNzI0ODUyNzE1LCJpc3MiOiJHZEJHaXYySk45Y3JkcDhIOHhGWkRxcTMzbm1yRUdzcFNWdDRTMkp0UnZXMiJ9.-Y3AYwL809xNBVs-w9UzR3kYi2G8PphH5Kc22HOH_pvDNHedg20qjQW5kaFfS-hWbCtH1lHfqmrpESEhx6gyDA';
+            this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJkZWxlZ2F0ZWQiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTjFaV1JHYjNJaU9pSklTRlkxYW05Q05rUTBZekp3YVdkV1dtTlJPVkpaTlhOMVJFMTJRV2xJUWt4TVFrTkdjVzFYZFUwMFJTSXNJbWxoZENJNk1UY3lORGcxT0RNMU55d2lhWE56SWpvaU9WaFJPRkpuWlhsQ2RXOVhjemRUZURJNVdEUmFWMHRoZEc5eE5WSmtObGxSTjFwbGNVUlNOMEpUU21ZaWZRLnRtUmNQbi15b1NTUExvUFoyNVNteGEzNUZlcWRDZUVGOWw3NzlNTGw2MUtqMC1JdllwYVY3UURoaW05V2dRb2xjRXZHNWxXS0luNXpMUHVSNzFZY0F3IiwiaWF0IjoxNzI0ODU4MzU4LCJpc3MiOiJISFY1am9CNkQ0YzJwaWdWWmNROVJZNXN1RE12QWlIQkxMQkNGcW1XdU00RSJ9.DPmAuzvBDqAVMFJ_0uQrJFipfsC_YJWrcewGgRKEa9x90dv7ER8y5jvYjbO7H7rfBM03HhFWOS7jZu-oDnJDDA';
 
             // Concatenate private key bytes and decoded public key bytes
             // const privateKeyBytes = Uint8Array.from([
@@ -85,9 +86,9 @@ class KycPartnerClient {
 
       async getData({ userPK, secretKey }) {
             const response = await this._apiClient.post('/v1/getData');
-            const responseData = response.data;
+            const responseData = response.data['data'];
 
-            const verifyKey = nacl.sign.keyPair.fromSeed(decodeBase58(userPK)).publicKey;
+            const verifyKey = base58.decode(userPK);
             const box = new SecretBox(Uint8Array.from(decodeBase58(secretKey)));
 
             const data = await Promise.all(
@@ -95,12 +96,10 @@ class KycPartnerClient {
                         const signedDataRaw = value;
                         if (!signedDataRaw) return [key, ''];
 
-                        const signedMessage = nacl.sign.open(
-                              Uint8Array.from(base64decode(signedDataRaw)),
-                              verifyKey
-                        );
+                        const signedMessage = naclUtil.decodeBase64(signedDataRaw);
+                        const message = nacl.sign.open(signedMessage, verifyKey);
 
-                        if (!signedMessage) {
+                        if (!message) {
                               throw new Error(`Invalid signature for key: ${key}`);
                         }
 
