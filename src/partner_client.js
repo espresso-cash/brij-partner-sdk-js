@@ -19,7 +19,7 @@ class KycPartnerClient {
             this._authPublicKey = '';
             this._token = '';
             this._apiClient = null;
-            this._secretBox = null;
+            this._secretBoxKey = null;
             this._signingKey = null;
       }
 
@@ -31,7 +31,7 @@ class KycPartnerClient {
       async _initializeEncryption(secretKey) {
             console.log("Secret Key:", secretKey);
             const secretKeyBytes = decodeBase58(secretKey);
-            this._secretBox = new SecretBox(Uint8Array.from(secretKeyBytes));
+            this._secretBoxKey = secretKeyBytes;
             const authPrivateKey = await this.authKeyPair.getPrivateKeyBytes();
 
             console.log("Auth Private Key Length:", authPrivateKey.length);
@@ -84,12 +84,29 @@ class KycPartnerClient {
             this._apiClient = instance;
       }
 
+      async decryptData(encryptedDataBase64) {
+            console.log("Decrypting data...");
+            console.log("Encrypted Data (Base64):", encryptedDataBase64);
+
+            const encryptedData = naclUtil.decodeBase64(encryptedDataBase64);
+            const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+            console.log("Encrypted Data (Uint8Array):", encryptedData);
+            console.log("Generated Nonce (Uint8Array):", nonce);
+
+            const decrypted = nacl.secretbox.open(encryptedData, nonce, this._secretBoxKey);
+
+            if (!decrypted) {
+                  throw new Error('Unable to decrypt data');
+            }
+
+            return naclUtil.encodeUTF8(decrypted);
+      }
+
       async getData({ userPK, secretKey }) {
             const response = await this._apiClient.post('/v1/getData');
             const responseData = response.data['data'];
 
             const verifyKey = base58.decode(userPK);
-            const box = new SecretBox(Uint8Array.from(decodeBase58(secretKey)));
 
             const data = await Promise.all(
                   Object.entries(responseData).map(async ([key, value]) => {
@@ -103,8 +120,9 @@ class KycPartnerClient {
                               throw new Error(`Invalid signature for key: ${key}`);
                         }
 
-                        const encryptedData = base64encode(signedMessage);
-                        const decrypted = box.decrypt(new TextDecoder().decode(base64decode(encryptedData)));
+                        const encryptedData = naclUtil.encodeBase64(signedMessage);
+
+                        const decrypted = await this.decryptData(encryptedData);
 
                         return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
                   })
@@ -177,30 +195,6 @@ class V1ValidationData {
             if (!value) return null;
             const encryptedData = encryptAndSignFunction(new TextEncoder().encode(value));
             return base64encode(encryptedData);
-      }
-}
-
-class SecretBox {
-      constructor(key) {
-            this.key = key;
-      }
-
-      encrypt(data) {
-            const iv = randomBytes(12);
-            const cipher = createCipheriv('aes-256-gcm', this.key, iv);
-            const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
-            const tag = cipher.getAuthTag();
-            return Buffer.concat([iv, encrypted, tag]);
-      }
-
-      decrypt(data) {
-            const iv = data.slice(0, 12);
-            const tag = data.slice(data.length - 16);
-            const encrypted = data.slice(12, data.length - 16);
-
-            const decipher = createDecipheriv('aes-256-gcm', this.key, iv);
-            decipher.setAuthTag(tag);
-            return Buffer.concat([decipher.update(encrypted), decipher.final()]);
       }
 }
 
