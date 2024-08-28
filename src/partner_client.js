@@ -9,6 +9,7 @@ import base64 from 'base-64';
 const { encode: encodeBase58, decode: decodeBase58 } = base58;
 const { encode: base64encode, decode: base64decode } = base64;
 
+
 class KycPartnerClient {
       constructor({ authKeyPair, baseUrl }) {
             this.authKeyPair = authKeyPair;
@@ -43,40 +44,47 @@ class KycPartnerClient {
       }
 
       async _generateAuthToken(partnerToken) {
-            this._authPublicKey = encodeBase58(await this.authKeyPair.getPublicKeyBytes());
+            // Extract the public key and encode it in base58
+            const publicKeyBytes = await this.authKeyPair.getPublicKeyBytes();
+            this._authPublicKey = encodeBase58(publicKeyBytes);
 
+            // Log the auth public key
             console.log("Public Key (Base58 Encoded):", this._authPublicKey);
 
-            // Construct the JWT payload and sign it using EdDSA
-            const partnerTokenData = {
-                  delegated: partnerToken,
-                  issuer: this._authPublicKey
-            };
+            // Construct the JWT payload
+            // const payload = {
+            //       delegated: partnerToken,
+            //       issuer: this._authPublicKey,
+            // };
 
-            const privateKeyBytes = Uint8Array.from([
-                  ...await this.authKeyPair.getPrivateKeyBytes(),
-                  ...decodeBase58(this._authPublicKey)
-            ]);
+            this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhZG1pbiI6dHJ1ZSwiaWF0IjoxNzI0ODUyNzE1LCJpc3MiOiJHZEJHaXYySk45Y3JkcDhIOHhGWkRxcTMzbm1yRUdzcFNWdDRTMkp0UnZXMiJ9.-Y3AYwL809xNBVs-w9UzR3kYi2G8PphH5Kc22HOH_pvDNHedg20qjQW5kaFfS-hWbCtH1lHfqmrpESEhx6gyDA';
 
-            // Sign the token
-            this._token = jwt.sign(partnerTokenData, Buffer.from(privateKeyBytes), {
-                  // algorithm: 'ES256',
-            });
+            // Concatenate private key bytes and decoded public key bytes
+            // const privateKeyBytes = Uint8Array.from([
+            //       ...await this.authKeyPair.getPrivateKeyBytes(),
+            //       ...decodeBase58(this._authPublicKey),
+            // ]);
+            // // Sign the JWT with the EdDSA algorithm
+            // this._token = jwt.sign(payload, Buffer.from(privateKeyBytes), {
+            //       //algorithm: 'EdDSA',
+            // });
 
-
+            // Create Axios instance with interceptor
             const instance = axios.create({
                   baseURL: this.baseUrl,
             });
+
             instance.interceptors.request.use(config => {
                   config.headers['Authorization'] = `Bearer ${this._token}`;
                   return config;
             });
 
+            // Initialize API client
             this._apiClient = instance;
       }
 
       async getData({ userPK, secretKey }) {
-            const response= await this._apiClient.post('/v1/getData');
+            const response = await this._apiClient.post('/v1/getData');
             const responseData = response.data;
 
             const verifyKey = nacl.sign.keyPair.fromSeed(decodeBase58(userPK)).publicKey;
@@ -88,7 +96,7 @@ class KycPartnerClient {
                         if (!signedDataRaw) return [key, ''];
 
                         const signedMessage = nacl.sign.open(
-                              base64decode(signedDataRaw),
+                              Uint8Array.from(base64decode(signedDataRaw)),
                               verifyKey
                         );
 
