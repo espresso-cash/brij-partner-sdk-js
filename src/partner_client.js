@@ -1,8 +1,7 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
-import jwt from 'jsonwebtoken';
+import { createHash} from 'crypto';
+import { SignJWT } from 'jose';
 import axios from 'axios';
 import nacl from 'tweetnacl';
-import { Buffer } from 'buffer';
 import base58 from 'bs58';
 import base64 from 'base-64';
 import naclUtil from 'tweetnacl-util';
@@ -45,32 +44,18 @@ class KycPartnerClient {
       }
 
       async _generateAuthToken(partnerToken) {
-            // Extract the public key and encode it in base58
             const publicKeyBytes = await this.authKeyPair.getPublicKeyBytes();
             this._authPublicKey = encodeBase58(publicKeyBytes);
 
-            // Log the auth public key
-            console.log("Public Key (Base58 Encoded):", this._authPublicKey);
+            const jwtPayload = { delegated: partnerToken };
 
-            // Construct the JWT payload
-            // const payload = {
-            //       delegated: partnerToken,
-            //       issuer: this._authPublicKey,
-            // };
+            this._token = await new SignJWT(jwtPayload)
+                  .setProtectedHeader({ alg: 'EdDSA', iss: this._authPublicKey })
+                  .sign(await this.authKeyPair.getPrivateKeyBytes());
 
-            this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJkZWxlZ2F0ZWQiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTjFaV1JHYjNJaU9pSklTRlkxYW05Q05rUTBZekp3YVdkV1dtTlJPVkpaTlhOMVJFMTJRV2xJUWt4TVFrTkdjVzFYZFUwMFJTSXNJbWxoZENJNk1UY3lORGcxT0RNMU55d2lhWE56SWpvaU9WaFJPRkpuWlhsQ2RXOVhjemRUZURJNVdEUmFWMHRoZEc5eE5WSmtObGxSTjFwbGNVUlNOMEpUU21ZaWZRLnRtUmNQbi15b1NTUExvUFoyNVNteGEzNUZlcWRDZUVGOWw3NzlNTGw2MUtqMC1JdllwYVY3UURoaW05V2dRb2xjRXZHNWxXS0luNXpMUHVSNzFZY0F3IiwiaWF0IjoxNzI0ODU4MzU4LCJpc3MiOiJISFY1am9CNkQ0YzJwaWdWWmNROVJZNXN1RE12QWlIQkxMQkNGcW1XdU00RSJ9.DPmAuzvBDqAVMFJ_0uQrJFipfsC_YJWrcewGgRKEa9x90dv7ER8y5jvYjbO7H7rfBM03HhFWOS7jZu-oDnJDDA';
+            console.log("Token:", this._token);
+            // this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJkZWxlZ2F0ZWQiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTjFaV1JHYjNJaU9pSklTRlkxYW05Q05rUTBZekp3YVdkV1dtTlJPVkpaTlhOMVJFMTJRV2xJUWt4TVFrTkdjVzFYZFUwMFJTSXNJbWxoZENJNk1UY3lORGcxT0RNMU55d2lhWE56SWpvaU9WaFJPRkpuWlhsQ2RXOVhjemRUZURJNVdEUmFWMHRoZEc5eE5WSmtObGxSTjFwbGNVUlNOMEpUU21ZaWZRLnRtUmNQbi15b1NTUExvUFoyNVNteGEzNUZlcWRDZUVGOWw3NzlNTGw2MUtqMC1JdllwYVY3UURoaW05V2dRb2xjRXZHNWxXS0luNXpMUHVSNzFZY0F3IiwiaWF0IjoxNzI0ODU4MzU4LCJpc3MiOiJISFY1am9CNkQ0YzJwaWdWWmNROVJZNXN1RE12QWlIQkxMQkNGcW1XdU00RSJ9.DPmAuzvBDqAVMFJ_0uQrJFipfsC_YJWrcewGgRKEa9x90dv7ER8y5jvYjbO7H7rfBM03HhFWOS7jZu-oDnJDDA';
 
-            // Concatenate private key bytes and decoded public key bytes
-            // const privateKeyBytes = Uint8Array.from([
-            //       ...await this.authKeyPair.getPrivateKeyBytes(),
-            //       ...decodeBase58(this._authPublicKey),
-            // ]);
-            // // Sign the JWT with the EdDSA algorithm
-            // this._token = jwt.sign(payload, Buffer.from(privateKeyBytes), {
-            //       //algorithm: 'EdDSA',
-            // });
-
-            // Create Axios instance with interceptor
             const instance = axios.create({
                   baseURL: this.baseUrl,
             });
