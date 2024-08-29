@@ -30,13 +30,7 @@ class KycPartnerClient {
       async _initializeEncryption() {
             const authPrivateKey = await this.authKeyPair.getPrivateKeyBytes();
 
-            console.log("Auth Private Key Length:", authPrivateKey.length);
-            const authPublicKeyBytes = decodeBase58(this._authPublicKey);
-            console.log("Auth Public Key Length:", authPublicKeyBytes.length);
-
             const seed = authPrivateKey.slice(0, 32);
-            console.log("Seed Length:", seed.length);
-
             this._signingKey = nacl.sign.keyPair.fromSeed(seed);
       }
 
@@ -51,10 +45,7 @@ class KycPartnerClient {
             const authKeyPair = nacl.sign.keyPair.fromSeed(seed);
 
             const publicKeyBytes = authKeyPair.publicKey;
-            console.log("publicKeyBytes:", publicKeyBytes.length);
-
             const privateKeyBytes = authKeyPair.secretKey;
-            console.log("privateKeyBytes:", privateKeyBytes.length);
 
             this._authPublicKey = encodeBase58(publicKeyBytes);
 
@@ -81,7 +72,6 @@ class KycPartnerClient {
                   return config;
             });
 
-            // Initialize API client
             this._apiClient = instance;
       }
 
@@ -143,10 +133,10 @@ class KycPartnerClient {
             await this._apiClient.post('/v1/setValidationResult', { data: encryptedValue, userPublicKey: userPk });
       }
 
-      async getValidationResult({ key, validatorPK, secretKey, userPk }) {
+      async getValidationResult({ key, secretKey, userPk }) {
             const response = await this._apiClient.post('/v1/getValidationResult', {
-                  validatorPublicKey: validatorPK,
                   userPublicKey: userPk,
+                  validatorPublicKey: this._authPublicKey,
             });
             const data = response.data[key];
 
@@ -178,26 +168,4 @@ class KycPartnerClient {
       }
 }
 
-class V1ValidationData {
-      constructor({ email, phone, kycSmileId }) {
-            this.email = email;
-            this.phone = phone;
-            this.kycSmileId = kycSmileId;
-      }
-
-      encryptAndSign(encryptAndSignFunction) {
-            return new V1ValidationData({
-                  email: this._encryptAndEncode(this.email, encryptAndSignFunction),
-                  phone: this._encryptAndEncode(this.phone, encryptAndSignFunction),
-                  kycSmileId: this._encryptAndEncode(this.kycSmileId, encryptAndSignFunction),
-            });
-      }
-
-      _encryptAndEncode(value, encryptAndSignFunction) {
-            if (!value) return null;
-            const encryptedData = encryptAndSignFunction(new TextEncoder().encode(value));
-            return base64encode(encryptedData);
-      }
-}
-
-export { KycPartnerClient, V1ValidationData };
+export { KycPartnerClient };

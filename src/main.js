@@ -31,12 +31,20 @@ import base58 from 'bs58';
 
             console.log('Initialization successful.');
 
-            const data = await partnerClient.getData({
+            const getData = await partnerClient.getData({
                   userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
                   secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw'
             });
 
-            console.log(data);
+            console.log('getData:', getData);
+
+            const getValidationResult = await partnerClient.getValidationResult({
+                  key: 'kycSmileId',
+                  userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
+                  secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw'
+            });
+
+            console.log('getValidationResult:', getValidationResult);
 
       } catch (error) {
             console.error('Error during initialization:', error);
