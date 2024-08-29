@@ -29,12 +29,15 @@ import base58 from 'bs58';
 
             await partnerClient.init();
 
-            await partnerClient.getData({
+            console.log('Initialization successful.');
+
+            const data = await partnerClient.getData({
                   userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
                   secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw'
             });
 
-            console.log('Initialization successful.');
+            console.log(data);
+
       } catch (error) {
             console.error('Error during initialization:', error);
       }

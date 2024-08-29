@@ -63,22 +63,28 @@ class KycPartnerClient {
             this._apiClient = instance;
       }
 
-      async decryptData(encryptedDataBase64) {
-            console.log("Decrypting data...");
-            console.log("Encrypted Data (Base64):", encryptedDataBase64);
+      async decryptData(encryptedMessage, key) {
+            const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
+            const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
 
-            const encryptedData = naclUtil.decodeBase64(encryptedDataBase64);
-            const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-            console.log("Encrypted Data (Uint8Array):", encryptedData);
-            console.log("Generated Nonce (Uint8Array):", nonce);
-
-            const decrypted = nacl.secretbox.open(encryptedData, nonce, this._secretBoxKey);
+            const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
 
             if (!decrypted) {
                   throw new Error('Unable to decrypt data');
             }
 
-            return naclUtil.encodeUTF8(decrypted);
+            return decrypted;
+      }
+
+
+      async encryptAndSignData(data, key) {
+            const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+            const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(data), nonce, key);
+            const encryptedData = new Uint8Array([...nonce, ...ciphertext]);
+
+            const signature = nacl.sign(encryptedData, this._signingKey.secretKey);
+
+            return signature;
       }
 
       async getData({ userPK, secretKey }) {
@@ -86,6 +92,7 @@ class KycPartnerClient {
             const responseData = response.data['data'];
 
             const verifyKey = base58.decode(userPK);
+            const secret = base58.decode(secretKey);
 
             const data = await Promise.all(
                   Object.entries(responseData).map(async ([key, value]) => {
@@ -99,9 +106,7 @@ class KycPartnerClient {
                               throw new Error(`Invalid signature for key: ${key}`);
                         }
 
-                        const encryptedData = naclUtil.encodeBase64(signedMessage);
-
-                        const decrypted = await this.decryptData(encryptedData);
+                        const decrypted = await this.decryptData(message, secret);
 
                         return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
                   })
@@ -148,11 +153,6 @@ class KycPartnerClient {
       async _hash(value) {
             const hash = createHash('blake2b512').update(value).digest('hex');
             return hash;
-      }
-
-      _encryptAndSign(data) {
-            const encrypted = this._secretBox.encrypt(data); //TODO
-            return nacl.sign(encrypted, this._signingKey.secretKey);
       }
 }
 
