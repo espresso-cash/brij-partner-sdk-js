@@ -58,7 +58,6 @@ class KycPartnerClient {
 
             this._authPublicKey = encodeBase58(publicKeyBytes);
 
-            //   const privateKeyBytes = this._signingKey.secretKey.slice(0, 32); // Only the seed part of the secret key
             const privateKeyJWK = {
                   kty: 'OKP',
                   crv: 'Ed25519',
@@ -66,26 +65,12 @@ class KycPartnerClient {
                   d: Buffer.from(privateKeyBytes.slice(0, 32)).toString('base64url'),
             };
 
+            let privateKey = await importJWK(privateKeyJWK, 'EdDSA');
 
-            let privateKey;
-            try {
-                  privateKey = await importJWK(privateKeyJWK, 'EdDSA');
-            } catch (error) {
-                  console.error("Error importing JWK:", error);
-                  throw error;
-            }
-
-            try {
-                  this._token = await new SignJWT({})
-                        .setProtectedHeader({ alg: 'EdDSA', iss: this._authPublicKey })
-                        .sign(privateKey);
-            } catch (error) {
-                  console.error("Error signing JWT:", error);
-                  throw error;
-            }
-
-            console.log("Token:", this._token);
-            //this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3MjQ5MzY1NjAsImlzcyI6IkhIVjVqb0I2RDRjMnBpZ1ZaY1E5Ulk1c3VETXZBaUhCTExCQ0ZxbVd1TTRFIn0.aVA83loop4Fh3PVrZMjMQbtymTEZ7rjLhOe6DpSNMYxnx1BcrFA6e7SAtDyqbzIa-UGEs7z_p_u6ol-s5uuvBQ';
+            this._token = await new SignJWT({})
+                  .setIssuer(base58.encode(publicKeyBytes))
+                  .setProtectedHeader({ alg: 'EdDSA' })
+                  .sign(privateKey);
 
             const instance = axios.create({
                   baseURL: this.baseUrl,
