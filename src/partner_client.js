@@ -4,12 +4,9 @@ import axios from 'axios';
 import nacl from 'tweetnacl';
 import base58 from 'bs58';
 import { Buffer } from 'buffer';
-import base64 from 'base-64';
 import naclUtil from 'tweetnacl-util';
 
-const { encode: encodeBase58, decode: decodeBase58 } = base58;
-const { encode: base64encode, decode: base64decode } = base64;
-
+const { encode: encodeBase58 } = base58;
 
 class KycPartnerClient {
       constructor({ authKeyPair, baseUrl }) {
@@ -36,16 +33,8 @@ class KycPartnerClient {
 
 
       async _generateAuthToken() {
-            const base58Seed = '8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz';
-            const seed = base58.decode(base58Seed);
-            if (seed.length !== 32) {
-                  throw new Error('Invalid seed length. Seed must be 32 bytes long.');
-            }
-
-            const authKeyPair = nacl.sign.keyPair.fromSeed(seed);
-
-            const publicKeyBytes = authKeyPair.publicKey;
-            const privateKeyBytes = authKeyPair.secretKey;
+            const publicKeyBytes = await this.authKeyPair.getPublicKeyBytes();
+            const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
 
             this._authPublicKey = encodeBase58(publicKeyBytes);
 

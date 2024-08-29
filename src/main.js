@@ -4,6 +4,11 @@ import base58 from 'bs58';
 
 (async () => {
       try {
+            const baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
+
+            const userPK = '919m6ZtJUffeUs1xC97kesELuGn5xLdF5vQ5vxGs91ii';
+            const secretKey = '7NRW281BKXt96ANtxHLys2iVAPa79S2M6bmzQAFhLYtv';
+
             const base58Seed = '8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz';
 
             const seed = base58.decode(base58Seed);
@@ -24,7 +29,7 @@ import base58 from 'bs58';
                               return authKeyPair.publicKey;
                         }
                   },
-                  baseUrl: 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app'
+                  baseUrl: baseURL,
             });
 
             await partnerClient.init();
@@ -32,16 +37,16 @@ import base58 from 'bs58';
             console.log('Initialization successful.');
 
             const getData = await partnerClient.getData({
-                  userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
-                  secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw'
+                  userPK: userPK,
+                  secretKey: secretKey,
             });
 
             console.log('getData:', getData);
 
             const getValidationResult = await partnerClient.getValidationResult({
                   key: 'kycSmileId',
-                  secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw',
-                  userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
+                  secretKey: secretKey,
+                  userPK: userPK,
             });
 
             console.log('getValidationResult:', getValidationResult);
