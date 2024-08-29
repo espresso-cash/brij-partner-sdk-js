@@ -1,4 +1,4 @@
-import { createHash} from 'crypto';
+import { createHash } from 'crypto';
 import { SignJWT } from 'jose';
 import axios from 'axios';
 import nacl from 'tweetnacl';
@@ -18,19 +18,15 @@ class KycPartnerClient {
             this._authPublicKey = '';
             this._token = '';
             this._apiClient = null;
-            this._secretBoxKey = null;
             this._signingKey = null;
       }
 
-      async init({ partnerToken, secretKey }) {
-            await this._generateAuthToken(partnerToken);
-            await this._initializeEncryption(secretKey);
+      async init() {
+            await this._generateAuthToken();
+            await this._initializeEncryption();
       }
 
-      async _initializeEncryption(secretKey) {
-            console.log("Secret Key:", secretKey);
-            const secretKeyBytes = decodeBase58(secretKey);
-            this._secretBoxKey = secretKeyBytes;
+      async _initializeEncryption() {
             const authPrivateKey = await this.authKeyPair.getPrivateKeyBytes();
 
             console.log("Auth Private Key Length:", authPrivateKey.length);
@@ -43,18 +39,16 @@ class KycPartnerClient {
             this._signingKey = nacl.sign.keyPair.fromSeed(seed);
       }
 
-      async _generateAuthToken(partnerToken) {
+      async _generateAuthToken() {
             const publicKeyBytes = await this.authKeyPair.getPublicKeyBytes();
             this._authPublicKey = encodeBase58(publicKeyBytes);
 
-            const jwtPayload = { delegated: partnerToken };
+            // this._token = await new SignJWT({})
+            //       .setProtectedHeader({ alg: 'EdDSA', iss: this._authPublicKey })
+            //       .sign(await this.authKeyPair.getPrivateKeyBytes());
 
-            this._token = await new SignJWT(jwtPayload)
-                  .setProtectedHeader({ alg: 'EdDSA', iss: this._authPublicKey })
-                  .sign(await this.authKeyPair.getPrivateKeyBytes());
-
-            console.log("Token:", this._token);
-            // this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJkZWxlZ2F0ZWQiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTjFaV1JHYjNJaU9pSklTRlkxYW05Q05rUTBZekp3YVdkV1dtTlJPVkpaTlhOMVJFMTJRV2xJUWt4TVFrTkdjVzFYZFUwMFJTSXNJbWxoZENJNk1UY3lORGcxT0RNMU55d2lhWE56SWpvaU9WaFJPRkpuWlhsQ2RXOVhjemRUZURJNVdEUmFWMHRoZEc5eE5WSmtObGxSTjFwbGNVUlNOMEpUU21ZaWZRLnRtUmNQbi15b1NTUExvUFoyNVNteGEzNUZlcWRDZUVGOWw3NzlNTGw2MUtqMC1JdllwYVY3UURoaW05V2dRb2xjRXZHNWxXS0luNXpMUHVSNzFZY0F3IiwiaWF0IjoxNzI0ODU4MzU4LCJpc3MiOiJISFY1am9CNkQ0YzJwaWdWWmNROVJZNXN1RE12QWlIQkxMQkNGcW1XdU00RSJ9.DPmAuzvBDqAVMFJ_0uQrJFipfsC_YJWrcewGgRKEa9x90dv7ER8y5jvYjbO7H7rfBM03HhFWOS7jZu-oDnJDDA';
+            // console.log("Token:", this._token);
+            this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3MjQ5MzY1NjAsImlzcyI6IkhIVjVqb0I2RDRjMnBpZ1ZaY1E5Ulk1c3VETXZBaUhCTExCQ0ZxbVd1TTRFIn0.aVA83loop4Fh3PVrZMjMQbtymTEZ7rjLhOe6DpSNMYxnx1BcrFA6e7SAtDyqbzIa-UGEs7z_p_u6ol-s5uuvBQ';
 
             const instance = axios.create({
                   baseURL: this.baseUrl,
@@ -88,7 +82,7 @@ class KycPartnerClient {
       }
 
       async getData({ userPK, secretKey }) {
-            const response = await this._apiClient.post('/v1/getData');
+            const response = await this._apiClient.post('/v1/getData', { publicKey: userPK });
             const responseData = response.data['data'];
 
             const verifyKey = base58.decode(userPK);
@@ -116,15 +110,16 @@ class KycPartnerClient {
             return Object.fromEntries(data);
       }
 
-      async setValidationResult({ value }) {
+      async setValidationResult({ value, userPk, secretKey }) {
             const encryptedValue = value.encryptAndSign(this._encryptAndSign.bind(this));
 
-            await this._apiClient.post('/v1/setValidationResult', { data: encryptedValue });
+            await this._apiClient.post('/v1/setValidationResult', { data: encryptedValue, userPublicKey: userPk });
       }
 
-      async getValidationResult({ key, validatorPK, secretKey }) {
+      async getValidationResult({ key, validatorPK, secretKey, userPk }) {
             const response = await this._apiClient.post('/v1/getValidationResult', {
-                  publicKey: validatorPK,
+                  validatorPublicKey: validatorPK,
+                  userPublicKey: userPk,
             });
             const data = response.data[key];
 
@@ -156,7 +151,7 @@ class KycPartnerClient {
       }
 
       _encryptAndSign(data) {
-            const encrypted = this._secretBox.encrypt(data);
+            const encrypted = this._secretBox.encrypt(data); //TODO
             return nacl.sign(encrypted, this._signingKey.secretKey);
       }
 }

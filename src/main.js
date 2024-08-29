@@ -27,14 +27,11 @@ import base58 from 'bs58';
                   baseUrl: 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app'
             });
 
-            await partnerClient.init({
-                  partnerToken: "",
-                  secretKey: '8gaVEuztm75uMq11TVRBDUexZmiFeFgCYRTn8ox6QS75'
-            });
+            await partnerClient.init();
 
             await partnerClient.getData({
-                  userPK: '9XQ8RgeyBuoWs7Sx29X4ZWKatoq5Rd6YQ7ZeqDR7BSJf',
-                  secretKey: '8gaVEuztm75uMq11TVRBDUexZmiFeFgCYRTn8ox6QS75'
+                  userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
+                  secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw'
             });
 
             console.log('Initialization successful.');
