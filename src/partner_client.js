@@ -1,8 +1,9 @@
 import { createHash } from 'crypto';
-import { SignJWT } from 'jose';
+import { SignJWT, importJWK } from 'jose';
 import axios from 'axios';
 import nacl from 'tweetnacl';
 import base58 from 'bs58';
+import { Buffer } from 'buffer';
 import base64 from 'base-64';
 import naclUtil from 'tweetnacl-util';
 
@@ -39,16 +40,52 @@ class KycPartnerClient {
             this._signingKey = nacl.sign.keyPair.fromSeed(seed);
       }
 
+
       async _generateAuthToken() {
-            const publicKeyBytes = await this.authKeyPair.getPublicKeyBytes();
+            const base58Seed = '8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz';
+            const seed = base58.decode(base58Seed);
+            if (seed.length !== 32) {
+                  throw new Error('Invalid seed length. Seed must be 32 bytes long.');
+            }
+
+            const authKeyPair = nacl.sign.keyPair.fromSeed(seed);
+
+            const publicKeyBytes = authKeyPair.publicKey;
+            console.log("publicKeyBytes:", publicKeyBytes.length);
+
+            const privateKeyBytes = authKeyPair.secretKey;
+            console.log("privateKeyBytes:", privateKeyBytes.length);
+
             this._authPublicKey = encodeBase58(publicKeyBytes);
 
-            // this._token = await new SignJWT({})
-            //       .setProtectedHeader({ alg: 'EdDSA', iss: this._authPublicKey })
-            //       .sign(await this.authKeyPair.getPrivateKeyBytes());
+            //   const privateKeyBytes = this._signingKey.secretKey.slice(0, 32); // Only the seed part of the secret key
+            const privateKeyJWK = {
+                  kty: 'OKP',
+                  crv: 'Ed25519',
+                  x: Buffer.from(publicKeyBytes).toString('base64url'),
+                  d: Buffer.from(privateKeyBytes.slice(0, 32)).toString('base64url'),
+            };
 
-            // console.log("Token:", this._token);
-            this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3MjQ5MzY1NjAsImlzcyI6IkhIVjVqb0I2RDRjMnBpZ1ZaY1E5Ulk1c3VETXZBaUhCTExCQ0ZxbVd1TTRFIn0.aVA83loop4Fh3PVrZMjMQbtymTEZ7rjLhOe6DpSNMYxnx1BcrFA6e7SAtDyqbzIa-UGEs7z_p_u6ol-s5uuvBQ';
+
+            let privateKey;
+            try {
+                  privateKey = await importJWK(privateKeyJWK, 'EdDSA');
+            } catch (error) {
+                  console.error("Error importing JWK:", error);
+                  throw error;
+            }
+
+            try {
+                  this._token = await new SignJWT({})
+                        .setProtectedHeader({ alg: 'EdDSA', iss: this._authPublicKey })
+                        .sign(privateKey);
+            } catch (error) {
+                  console.error("Error signing JWT:", error);
+                  throw error;
+            }
+
+            console.log("Token:", this._token);
+            //this._token = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3MjQ5MzY1NjAsImlzcyI6IkhIVjVqb0I2RDRjMnBpZ1ZaY1E5Ulk1c3VETXZBaUhCTExCQ0ZxbVd1TTRFIn0.aVA83loop4Fh3PVrZMjMQbtymTEZ7rjLhOe6DpSNMYxnx1BcrFA6e7SAtDyqbzIa-UGEs7z_p_u6ol-s5uuvBQ';
 
             const instance = axios.create({
                   baseURL: this.baseUrl,
