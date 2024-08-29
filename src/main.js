@@ -40,8 +40,8 @@ import base58 from 'bs58';
 
             const getValidationResult = await partnerClient.getValidationResult({
                   key: 'kycSmileId',
+                  secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw',
                   userPK: 'Fqejxi9cBSkUD3VPG8QSqQLySWKwSprGnuVPeiNW9jh8',
-                  secretKey: '7KFykNxNyzhMr85V8BGzA9MR5ommGgpmHdfBuPkEV4Gw'
             });
 
             console.log('getValidationResult:', getValidationResult);

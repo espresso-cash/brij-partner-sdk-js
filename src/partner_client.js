@@ -133,19 +133,19 @@ class KycPartnerClient {
             await this._apiClient.post('/v1/setValidationResult', { data: encryptedValue, userPublicKey: userPk });
       }
 
-      async getValidationResult({ key, secretKey, userPk }) {
+      async getValidationResult({ key, secretKey, userPK }) {
             const response = await this._apiClient.post('/v1/getValidationResult', {
-                  userPublicKey: userPk,
+                  userPublicKey: userPK,
                   validatorPublicKey: this._authPublicKey,
             });
-            const data = response.data[key];
+            const data = response.data['data'][key];
 
             if (!data) return null;
 
-            const box = new SecretBox(Uint8Array.from(decodeBase58(secretKey)));
-            const signedMessage = nacl.sign.open(base64decode(data));
-            const encryptedData = base64encode(signedMessage);
-            const decrypted = box.decrypt(new TextDecoder().decode(base64decode(encryptedData)));
+            const secret = base58.decode(secretKey);
+
+            const signedMessage = naclUtil.decodeBase64(data);
+            const decrypted = await this.decryptData(signedMessage, secret);
 
             return new TextDecoder().decode(decrypted);
       }
