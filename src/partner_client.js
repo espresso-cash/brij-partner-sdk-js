@@ -85,7 +85,7 @@ class KycPartnerClient {
 
             const signature = nacl.sign(encryptedData, this._signingKey.secretKey);
 
-            return signature;
+            return naclUtil.encodeBase64(signature);
       }
 
       async getData({ userPK, secretKey }) {
@@ -117,9 +117,11 @@ class KycPartnerClient {
       }
 
       async setValidationResult({ value, userPk, secretKey }) {
-            const encryptedValue = value.encryptAndSign(this._encryptAndSign.bind(this));
 
-            await this._apiClient.post('/v1/setValidationResult', { data: encryptedValue, userPublicKey: userPk });
+            const secret = base58.decode(secretKey);
+            const encryptedValue = await this.encryptAndSignData(value, secret);
+
+            await this._apiClient.post('/v1/setValidationResult', { data: { 'kycSmileId': encryptedValue }, userPublicKey: userPk });
       }
 
       async getValidationResult({ key, secretKey, userPK }) {

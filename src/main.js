@@ -43,6 +43,14 @@ import base58 from 'bs58';
 
             console.log('getData:', getData);
 
+             await partnerClient.setValidationResult({
+                  value: 'kycSmileId',
+                  secretKey: secretKey,
+                  userPK: userPK,
+            });
+
+            console.log('setValidationResult Done');
+
             const getValidationResult = await partnerClient.getValidationResult({
                   key: 'kycSmileId',
                   secretKey: secretKey,
