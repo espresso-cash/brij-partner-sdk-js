@@ -6,13 +6,10 @@ import base58 from 'bs58';
 import { Buffer } from 'buffer';
 import naclUtil from 'tweetnacl-util';
 
-const { encode: encodeBase58 } = base58;
-
 class KycPartnerClient {
       constructor({ authKeyPair, baseUrl }) {
             this.authKeyPair = authKeyPair;
             this.baseUrl = baseUrl;
-
             this._authPublicKey = '';
             this._token = '';
             this._apiClient = null;
@@ -20,23 +17,25 @@ class KycPartnerClient {
       }
 
       async init() {
-            await this._generateAuthToken();
-            await this._initializeEncryption();
+            await Promise.all([
+                  this._generateAuthToken(),
+                  this._initializeEncryption()
+            ]);
       }
 
       async _initializeEncryption() {
             const authPrivateKey = await this.authKeyPair.getPrivateKeyBytes();
-
-            const seed = authPrivateKey.slice(0, 32);
-            this._signingKey = nacl.sign.keyPair.fromSeed(seed);
+            this._signingKey = nacl.sign.keyPair.fromSeed(authPrivateKey.slice(0, 32));
       }
 
 
       async _generateAuthToken() {
-            const publicKeyBytes = await this.authKeyPair.getPublicKeyBytes();
-            const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
+            const [publicKeyBytes, privateKeyBytes] = await Promise.all([
+                  this.authKeyPair.getPublicKeyBytes(),
+                  this.authKeyPair.getPrivateKeyBytes()
+            ]);
 
-            this._authPublicKey = encodeBase58(publicKeyBytes);
+            this._authPublicKey = base58.encode(publicKeyBytes);
 
             const privateKeyJWK = {
                   kty: 'OKP',
@@ -46,25 +45,18 @@ class KycPartnerClient {
             };
 
             let privateKey = await importJWK(privateKeyJWK, 'EdDSA');
-
             this._token = await new SignJWT({})
                   .setIssuer(base58.encode(publicKeyBytes))
                   .setProtectedHeader({ alg: 'EdDSA' })
                   .sign(privateKey);
 
-            const instance = axios.create({
+            this._apiClient = axios.create({
                   baseURL: this.baseUrl,
+                  headers: { 'Authorization': `Bearer ${this._token}` }
             });
-
-            instance.interceptors.request.use(config => {
-                  config.headers['Authorization'] = `Bearer ${this._token}`;
-                  return config;
-            });
-
-            this._apiClient = instance;
       }
 
-      async decryptData(encryptedMessage, key) {
+      async _decryptData(encryptedMessage, key) {
             const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
             const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
 
@@ -78,7 +70,7 @@ class KycPartnerClient {
       }
 
 
-      async encryptAndSignData(data, key) {
+      async _encryptAndSignData(data, key) {
             const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
             const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(data), nonce, key);
             const encryptedData = new Uint8Array([...nonce, ...ciphertext]);
@@ -90,25 +82,23 @@ class KycPartnerClient {
 
       async getData({ userPK, secretKey }) {
             const response = await this._apiClient.post('/v1/getData', { publicKey: userPK });
-            const responseData = response.data['data'];
+            const responseData = response.data.data;
 
             const verifyKey = base58.decode(userPK);
             const secret = base58.decode(secretKey);
 
             const data = await Promise.all(
                   Object.entries(responseData).map(async ([key, value]) => {
-                        const signedDataRaw = value;
-                        if (!signedDataRaw) return [key, ''];
+                        if (!value) return [key, ''];
 
-                        const signedMessage = naclUtil.decodeBase64(signedDataRaw);
+                        const signedMessage = naclUtil.decodeBase64(value);
                         const message = nacl.sign.open(signedMessage, verifyKey);
 
                         if (!message) {
                               throw new Error(`Invalid signature for key: ${key}`);
                         }
 
-                        const decrypted = await this.decryptData(message, secret);
-
+                        const decrypted = await this._decryptData(message, secret);
                         return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
                   })
             );
@@ -118,19 +108,20 @@ class KycPartnerClient {
 
       async setValidationResult({ value, userPK, secretKey }) {
             const secret = base58.decode(secretKey);
-
             const encryptedData = {};
-            for (const [key, val] of Object.entries(value)) {
-                  if (val !== null && val !== undefined) {
-                        encryptedData[key] = await this.encryptAndSignData(val, secret);
-                  }
-            }
+
+            await Promise.all(
+                  Object.entries(value).map(async ([key, val]) => {
+                        if (val != null) {
+                              encryptedData[key] = await this._encryptAndSignData(val, secret);
+                        }
+                  })
+            );
 
             await this._apiClient.post('/v1/setValidationResult', {
                   userPublicKey: userPK,
                   data: encryptedData
             });
-
       }
 
       async getValidationResult({ key, secretKey, userPK }) {
@@ -147,26 +138,23 @@ class KycPartnerClient {
             const signedMessage = naclUtil.decodeBase64(data);
             const message = signedMessage.slice(nacl.sign.signatureLength);
 
-            const decrypted = await this.decryptData(message, secret);
+            const decrypted = await this._decryptData(message, secret);
 
             return new TextDecoder().decode(decrypted);
       }
 
       async validateField(value) {
-            const updatedEmail = value.email != null ? await this._hash(value.email) : null;
-            const updatedPhone = value.phone != null ? await this._hash(value.phone) : null;
+            const [updatedEmail, updatedPhone] = await Promise.all([
+                  value.email != null ? this._hash(value.email) : null,
+                  value.phone != null ? this._hash(value.phone) : null
+            ]);
 
-            const updatedValue = Object.assign({}, value, {
-                  email: updatedEmail,
-                  phone: updatedPhone,
-            });
-
+            const updatedValue = { ...value, email: updatedEmail, phone: updatedPhone };
             await this.setValidationResult({ value: updatedValue });
       }
 
       async _hash(value) {
-            const hash = createHash('blake2b512').update(value).digest('hex');
-            return hash;
+            return createHash('blake2b512').update(value).digest('hex');
       }
 }
 
