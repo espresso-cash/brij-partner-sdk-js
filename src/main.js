@@ -35,14 +35,14 @@ import base58 from 'bs58';
             });
 
             console.log('getData:', getData);
+            const currentDate = new Date().toISOString();
+            await partnerClient.setValidationResult({
+                  value: `passed ${currentDate}`,
+                  secretKey: secretKey,
+                  userPK: userPK,
+            });
 
-            // await partnerClient.setValidationResult({
-            //       value: 'kycSmileId',
-            //       secretKey: secretKey,
-            //       userPK: userPK,
-            // });
-
-            // console.log('setValidationResult Done');
+            console.log('setValidationResult Done');
 
             const getValidationResult = await partnerClient.getValidationResult({
                   key: 'kycSmileId',
