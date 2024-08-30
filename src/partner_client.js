@@ -117,7 +117,6 @@ class KycPartnerClient {
       }
 
       async setValidationResult({ value, userPk, secretKey }) {
-
             const secret = base58.decode(secretKey);
             const encryptedValue = await this.encryptAndSignData(value, secret);
 

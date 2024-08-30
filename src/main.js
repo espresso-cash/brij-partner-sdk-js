@@ -6,18 +6,11 @@ import base58 from 'bs58';
       try {
             const baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
 
-            const userPK = '919m6ZtJUffeUs1xC97kesELuGn5xLdF5vQ5vxGs91ii';
-            const secretKey = '7NRW281BKXt96ANtxHLys2iVAPa79S2M6bmzQAFhLYtv';
-
-            const base58Seed = '8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz';
-
-            const seed = base58.decode(base58Seed);
-
-            if (seed.length !== 32) {
-                  throw new Error('Invalid seed length. Seed must be 32 bytes long.');
-            }
-
+            const seed = base58.decode('8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz');
             const authKeyPair = nacl.sign.keyPair.fromSeed(seed);
+
+            const userPK = 'H3rpRiSxVn5VWfjvWHorUcFjRgLZncXZWaSnQZtw1evx';
+            const secretKey = 'BhQsVWuRtnmKjd1L9vLnncMYoQx3GTMQiEKHWbqy25Ga';
 
             // Example usage of KycPartnerClient
             const partnerClient = new KycPartnerClient({
@@ -43,13 +36,13 @@ import base58 from 'bs58';
 
             console.log('getData:', getData);
 
-             await partnerClient.setValidationResult({
-                  value: 'kycSmileId',
-                  secretKey: secretKey,
-                  userPK: userPK,
-            });
+            // await partnerClient.setValidationResult({
+            //       value: 'kycSmileId',
+            //       secretKey: secretKey,
+            //       userPK: userPK,
+            // });
 
-            console.log('setValidationResult Done');
+            // console.log('setValidationResult Done');
 
             const getValidationResult = await partnerClient.getValidationResult({
                   key: 'kycSmileId',
@@ -60,6 +53,6 @@ import base58 from 'bs58';
             console.log('getValidationResult:', getValidationResult);
 
       } catch (error) {
-            console.error('Error during initialization:', error);
+            console.error('Error:', error);
       }
 })();
