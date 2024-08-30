@@ -37,7 +37,7 @@ import base58 from 'bs58';
             console.log('getData:', getData);
             const currentDate = new Date().toISOString();
             await partnerClient.setValidationResult({
-                  value: `passed ${currentDate}`,
+                  value: { kycSmileId: `passed ${currentDate}` },
                   secretKey: secretKey,
                   userPK: userPK,
             });

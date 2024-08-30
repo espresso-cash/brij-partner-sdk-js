@@ -118,14 +118,17 @@ class KycPartnerClient {
 
       async setValidationResult({ value, userPK, secretKey }) {
             const secret = base58.decode(secretKey);
-            const encryptedValue = await this.encryptAndSignData(value, secret);
 
+            const encryptedData = {};
+            for (const [key, val] of Object.entries(value)) {
+                  if (val !== null && val !== undefined) {
+                        encryptedData[key] = await this.encryptAndSignData(val, secret);
+                  }
+            }
 
             await this._apiClient.post('/v1/setValidationResult', {
                   userPublicKey: userPK,
-                  data: {
-                        kycSmileId: encryptedValue
-                  }
+                  data: encryptedData
             });
 
       }
