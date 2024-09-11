@@ -143,6 +143,16 @@ class KycPartnerClient {
             return new TextDecoder().decode(decrypted);
       }
 
+      async getOrder(orderId) {
+            const response = await this._apiClient.post('/v1/getOrder', {
+                  orderId: orderId,
+            });
+
+            console.log(response);
+
+            return response;
+      }
+
       async validateField(value) {
             const [updatedEmail, updatedPhone] = await Promise.all([
                   value.email != null ? this._hash(value.email) : null,

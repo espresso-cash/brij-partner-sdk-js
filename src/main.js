@@ -52,6 +52,10 @@ import base58 from 'bs58';
 
             console.log('getValidationResult:', getValidationResult);
 
+            const orderId = 'ca938ea9-7d02-47ad-88c1-1270be8d2581';
+            const order = await partnerClient.getOrder(orderId);
+            console.log('fetch order:', order);
+
       } catch (error) {
             console.error('Error:', error);
       }
