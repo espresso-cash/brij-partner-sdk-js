@@ -148,9 +148,7 @@ class KycPartnerClient {
                   orderId: orderId,
             });
 
-            console.log(response);
-
-            return response;
+            return response.data;
       }
 
       async validateField(value) {
