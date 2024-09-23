@@ -53,8 +53,28 @@ import base58 from 'bs58';
             console.log('getValidationResult:', getValidationResult);
 
             const orderId = '04dfb6b9-94ad-4850-9f2d-963ad97e5c52';
-            const order = await partnerClient.getOrder(orderId);
+            let order = await partnerClient.getOrder(orderId);
             console.log('fetch order:', order);
+
+            await partnerClient.acceptOrder(orderId);
+            console.log('acceptOrder Done');
+            order = await partnerClient.getOrder(orderId);
+            console.log('updated order:', order);
+
+            await partnerClient.completeOrder(orderId);
+            console.log('completeOrder Done');
+            order = await partnerClient.getOrder(orderId);
+            console.log('updated order:', order);
+
+            await partnerClient.failOrder(orderId);
+            console.log('failOrder Done');
+            order = await partnerClient.getOrder(orderId);
+            console.log('updated order:', order);
+
+            await partnerClient.rejectOrder(orderId);
+            console.log('rejectOrder Done');
+            order = await partnerClient.getOrder(orderId);
+            console.log('updated order:', order);
 
       } catch (error) {
             console.error('Error:', error);
