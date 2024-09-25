@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { SignJWT, importJWK, base64url } from 'jose';
+import { base64url } from 'jose';
 import axios from 'axios';
 import nacl from 'tweetnacl';
 import base58 from 'bs58';
@@ -36,18 +36,22 @@ class KycPartnerClient {
 
         this._authPublicKey = base58.encode(publicKeyBytes);
 
-        const privateKeyJWK = {
-            kty: 'OKP',
-            crv: 'Ed25519',
-            x: base64url.encode(publicKeyBytes),
-            d: base64url.encode(privateKeyBytes.slice(0, 32)),
+        const header = { alg: 'EdDSA', typ: 'JWT' };
+        const payload = {
+            iss: this._authPublicKey,
+            iat: Math.floor(Date.now() / 1000)
         };
 
-        let privateKey = await importJWK(privateKeyJWK, 'EdDSA');
-        this._token = await new SignJWT({})
-            .setIssuer(base58.encode(publicKeyBytes))
-            .setProtectedHeader({ alg: 'EdDSA' })
-            .sign(privateKey);
+        const encodedHeader = base64url.encode(JSON.stringify(header));
+        const encodedPayload = base64url.encode(JSON.stringify(payload));
+        const dataToSign = `${encodedHeader}.${encodedPayload}`;
+
+        const signature = nacl.sign.detached(
+            new TextEncoder().encode(dataToSign),
+            privateKeyBytes
+        );
+
+        this._token = `${dataToSign}.${base64url.encode(signature)}`;
 
         this._apiClient = axios.create({
             baseURL: this.baseUrl,
