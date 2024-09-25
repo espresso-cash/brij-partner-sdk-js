@@ -172,15 +172,17 @@ class KycPartnerClient {
         });
     }
 
-    failOrder = async (orderId) => {
+    failOrder = async (orderId, reason) => {
         await this._apiClient.post('/v1/failOrder', {
             orderId: orderId,
+            reason: reason
         });
     }
 
-    rejectOrder = async (orderId) => {
+    rejectOrder = async (orderId, reason) => {
         await this._apiClient.post('/v1/rejectOrder', {
             orderId: orderId,
+            reason: reason
         });
     }
 
