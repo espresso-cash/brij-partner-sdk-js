@@ -1,6 +1,6 @@
 {
   "name": "kyc_client_js",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "src/partner_client.js",
   "type": "module",

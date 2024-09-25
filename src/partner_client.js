@@ -1,9 +1,8 @@
 import { createHash } from 'crypto';
-import { SignJWT, importJWK } from 'jose';
+import { SignJWT, importJWK, base64url } from 'jose';
 import axios from 'axios';
 import nacl from 'tweetnacl';
 import base58 from 'bs58';
-import { Buffer } from 'buffer';
 import naclUtil from 'tweetnacl-util';
 
 class KycPartnerClient {
@@ -40,8 +39,8 @@ class KycPartnerClient {
         const privateKeyJWK = {
             kty: 'OKP',
             crv: 'Ed25519',
-            x: Buffer.from(publicKeyBytes).toString('base64url'),
-            d: Buffer.from(privateKeyBytes.slice(0, 32)).toString('base64url'),
+            x: base64url.encode(publicKeyBytes),
+            d: base64url.encode(privateKeyBytes.slice(0, 32)),
         };
 
         let privateKey = await importJWK(privateKeyJWK, 'EdDSA');
@@ -180,7 +179,6 @@ class KycPartnerClient {
             orderId: orderId,
         });
     }
-
 
     async validateField(value) {
         const [updatedEmail, updatedPhone] = await Promise.all([
