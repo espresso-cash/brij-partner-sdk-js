@@ -2,7 +2,7 @@
   "name": "kyc_client_js",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "src/partner_client.js",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
