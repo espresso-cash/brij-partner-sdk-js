@@ -160,30 +160,38 @@ class KycPartnerClient {
         return response.data;
     }
 
-    acceptOrder = async (orderId) => {
+    async acceptOrder(orderId) {
         await this._apiClient.post('/v1/acceptOrder', {
             orderId: orderId,
         });
     }
 
-    completeOrder = async (orderId) => {
+    async completeOrder(orderId) {
         await this._apiClient.post('/v1/completeOrder', {
             orderId: orderId,
         });
     }
 
-    failOrder = async (orderId, reason) => {
+    async failOrder(orderId, reason) {
         await this._apiClient.post('/v1/failOrder', {
             orderId: orderId,
             reason: reason
         });
     }
 
-    rejectOrder = async (orderId, reason) => {
+    async rejectOrder(orderId, reason) {
         await this._apiClient.post('/v1/rejectOrder', {
             orderId: orderId,
             reason: reason
         });
+    }
+
+    async getUserInfo(publicKey) {
+        const response = await this._apiClient.post('/v1/getInfo', {
+            publicKey: publicKey
+        });
+
+        return response.data;
     }
 
     async validateField(value) {
