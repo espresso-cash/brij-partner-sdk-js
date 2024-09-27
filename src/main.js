@@ -9,8 +9,7 @@ import base58 from 'bs58';
             const seed = base58.decode('8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz');
             const authKeyPair = nacl.sign.keyPair.fromSeed(seed);
 
-            const userPK = 'HndFNdWRyVRKNiX3PYHm9WBxsqff1w9zQHejSNdTNwHr';
-            const secretKey = '3brjs1o3gGbdJ174pTW1BNHL39hea9Jv1cGK5zKRkJyj';
+            const userPK = 'ErzfmPs25aX2TGgxrjZKj2mz1GcfhYmRGqJyTXoiMKC5';
 
             // Example usage of KycPartnerClient
             const partnerClient = new KycPartnerClient({
@@ -29,42 +28,45 @@ import base58 from 'bs58';
 
             console.log('Initialization successful.');
 
-            // const getData = await partnerClient.getData({
-            //       userPK: userPK,
-            //       secretKey: secretKey,
-            // });
+            const userSecretKey = await partnerClient.getUserSecretKey(userPK);
+            console.log('userSecretKey:', userSecretKey);
 
-            // console.log('getData:', getData);
-            // const currentDate = new Date().toISOString();
-            // await partnerClient.setValidationResult({
-            //       value: { kycSmileId: `passed ${currentDate}` },
-            //       secretKey: secretKey,
-            //       userPK: userPK,
-            // });
+            const secretKey = userSecretKey;
 
-            const userInfo = await partnerClient.getUserSecretKey(userPK);
-            console.log('userInfo:', userInfo);
+            const getData = await partnerClient.getData({
+                  userPK: userPK,
+                  secretKey: secretKey,
+            });
 
-            // console.log('setValidationResult Done');
+            console.log('getData:', getData);
+            const currentDate = new Date().toISOString();
+            await partnerClient.setValidationResult({
+                  value: { kycSmileId: `passed ${currentDate}` },
+                  secretKey: secretKey,
+                  userPK: userPK,
+            });
 
-            // const getValidationResult = await partnerClient.getValidationResult({
-            //       key: 'kycSmileId',
-            //       secretKey: secretKey,
-            //       userPK: userPK,
-            // });
 
-            // console.log('getValidationResult:', getValidationResult);
+            console.log('setValidationResult Done');
 
-            // const ordersResponse = await partnerClient.getPartnerOrders();
-            // console.log('Partner orders:');
-            // const orders = ordersResponse.orders || [];
-            // orders.forEach((order, index) => {
-            //       console.log(`Order ${index + 1}:`, order);
-            // });
+            const getValidationResult = await partnerClient.getValidationResult({
+                  key: 'kycSmileId',
+                  secretKey: secretKey,
+                  userPK: userPK,
+            });
 
-            // const orderId = '300e1d32-80df-4a9e-91a2-d694ce199adb';
-            // let order = await partnerClient.getOrder(orderId);
-            // console.log('fetch order:', order);
+            console.log('getValidationResult:', getValidationResult);
+
+            const ordersResponse = await partnerClient.getPartnerOrders();
+            console.log('Partner orders:');
+            const orders = ordersResponse.orders || [];
+            orders.forEach((order, index) => {
+                  console.log(`Order ${index + 1}:`, order);
+            });
+
+            const orderId = '300e1d32-80df-4a9e-91a2-d694ce199adb';
+            let order = await partnerClient.getOrder(orderId);
+            console.log('fetch order:', order);
 
             // await partnerClient.acceptOrder(orderId);
             // console.log('acceptOrder Done');

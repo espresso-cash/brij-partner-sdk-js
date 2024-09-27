@@ -220,7 +220,7 @@ class KycPartnerClient {
             throw new Error('Decryption failed');
         }
 
-        return naclUtil.encodeBase64(decryptedSecretKey);
+        return base58.encode(decryptedSecretKey);
     }
 
     async validateField(value) {
