@@ -1,6 +1,6 @@
 {
   "name": "kyc_client_js",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "",
   "main": "src/partner_client.js",
   "type": "module",
@@ -14,6 +14,7 @@
     "axios": "^1.7.5",
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
+    "ed2curve": "^0.3.0",
     "jose": "^5.8.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1"

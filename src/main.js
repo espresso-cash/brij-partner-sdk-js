@@ -9,8 +9,7 @@ import base58 from 'bs58';
             const seed = base58.decode('8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz');
             const authKeyPair = nacl.sign.keyPair.fromSeed(seed);
 
-            const userPK = 'H3rpRiSxVn5VWfjvWHorUcFjRgLZncXZWaSnQZtw1evx';
-            const secretKey = 'BhQsVWuRtnmKjd1L9vLnncMYoQx3GTMQiEKHWbqy25Ga';
+            const userPK = 'ErzfmPs25aX2TGgxrjZKj2mz1GcfhYmRGqJyTXoiMKC5';
 
             // Example usage of KycPartnerClient
             const partnerClient = new KycPartnerClient({
@@ -29,6 +28,11 @@ import base58 from 'bs58';
 
             console.log('Initialization successful.');
 
+            const userSecretKey = await partnerClient.getUserSecretKey(userPK);
+            console.log('userSecretKey:', userSecretKey);
+
+            const secretKey = userSecretKey;
+
             const getData = await partnerClient.getData({
                   userPK: userPK,
                   secretKey: secretKey,
@@ -41,6 +45,7 @@ import base58 from 'bs58';
                   secretKey: secretKey,
                   userPK: userPK,
             });
+
 
             console.log('setValidationResult Done');
 

@@ -4,6 +4,7 @@ import axios from 'axios';
 import nacl from 'tweetnacl';
 import base58 from 'bs58';
 import naclUtil from 'tweetnacl-util';
+import ed2curve from 'ed2curve';
 
 class KycPartnerClient {
     constructor({ authKeyPair, baseUrl }) {
@@ -192,6 +193,34 @@ class KycPartnerClient {
         });
 
         return response.data;
+    }
+
+    async getUserSecretKey(publicKey) {
+        const info = await this.getUserInfo(publicKey);
+
+        const encryptedData = naclUtil.decodeBase64(info.encryptedSecretKey);
+
+        const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
+        const x25519PrivateKey = ed2curve.convertSecretKey(privateKeyBytes);
+
+        const userPk = base58.decode(publicKey);
+        const x25519PublicKey = ed2curve.convertPublicKey(userPk);
+
+        const nonce = encryptedData.slice(0, nacl.box.nonceLength);
+        const ciphertext = encryptedData.slice(nacl.box.nonceLength);
+
+        const decryptedSecretKey = nacl.box.open(
+            ciphertext,
+            nonce,
+            x25519PublicKey,
+            x25519PrivateKey
+        );
+
+        if (!decryptedSecretKey) {
+            throw new Error('Decryption failed');
+        }
+
+        return base58.encode(decryptedSecretKey);
     }
 
     async validateField(value) {
