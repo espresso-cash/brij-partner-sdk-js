@@ -16,6 +16,18 @@ class KycPartnerClient {
         this._signingKey = null;
     }
 
+    static async generateKeyPair() {
+        const keyPair = nacl.sign.keyPair();
+        return {
+            publicKey: base58.encode(keyPair.publicKey),
+            privateKey: base58.encode(keyPair.secretKey),
+            secretKey: base58.encode(keyPair.secretKey),
+            seed: base58.encode(keyPair.secretKey.slice(0, 32)),
+            getPublicKeyBytes: async () => keyPair.publicKey,
+            getPrivateKeyBytes: async () => keyPair.secretKey
+        };
+    }
+
     async init() {
         await Promise.all([
             this._generateAuthToken(),

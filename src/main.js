@@ -88,6 +88,9 @@ import base58 from 'bs58';
             // order = await partnerClient.getOrder(orderId);
             // console.log('updated order:', order);
 
+            const generatedKeyPair = await KycPartnerClient.generateKeyPair();
+            console.log('Generated Public Key:', generatedKeyPair.publicKey);
+
       } catch (error) {
             console.error('Error:', error);
       }
