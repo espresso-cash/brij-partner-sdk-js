@@ -110,7 +110,7 @@ const partnerFlowSampleUsage = async (partnerClient) => {
       const secretKey = await partnerClient.getUserSecretKey(userPK);
 
       // 2. Get KYC result
-      const kyc = await partnerClient.getValidationResult({
+      const kycValidationResult = await partnerClient.getValidationResult({
             key: 'kycSmileId',
             secretKey: secretKey,
             userPK: userPK,
@@ -118,7 +118,7 @@ const partnerFlowSampleUsage = async (partnerClient) => {
 
       // KYC should return JSON result of validation. Ie: for Nigeria, it is SmileID result
       // You can do more validation of user here
-      if (!kyc?.includes('passed')) {
+      if (!kycValidationResult?.includes('passed')) {
             // Reject order if KYC not completed
             await partnerClient.rejectOrder(orderId, 'KYC not completed');
 
@@ -126,13 +126,21 @@ const partnerFlowSampleUsage = async (partnerClient) => {
       }
 
       // 3. Get phone validation result
-      const phone = await partnerClient.getValidationResult({
+      // Email and phone validation result are stored with hash
+      // Compare validation result hash with the hash of value stored in the user data
+      const phoneValidationResult = await partnerClient.getValidationResult({
             key: 'phone',
             secretKey: secretKey,
             userPK: userPK,
       });
 
-      if (!phone?.trim()) {
+      const getData = await partnerClient.getData({
+            userPK: userPK,
+            secretKey: secretKey,
+      });
+      const phoneHash = partnerClient.has(getData.phone);
+
+      if (phoneValidationResult !== phoneHash) {
             // Reject order if phone not verified
             await partnerClient.rejectOrder(orderId, 'Phone not verified');
 
@@ -140,12 +148,14 @@ const partnerFlowSampleUsage = async (partnerClient) => {
       }
 
       // 4. Get email validation result
-      const email = await partnerClient.getValidationResult({
+      const emailValidationResult = await partnerClient.getValidationResult({
             key: 'email',
             secretKey: secretKey,
             userPK: userPK,
       });
-      if (!email?.trim()) {
+
+      const emailHash = partnerClient.has(getData.email);
+      if (emailValidationResult !== emailHash) {
             // Reject order if email not verified
             await partnerClient.rejectOrder(orderId, 'Email not verified');
 

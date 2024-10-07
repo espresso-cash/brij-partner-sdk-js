@@ -237,15 +237,15 @@ class KycPartnerClient {
 
     async validateField(value) {
         const [updatedEmail, updatedPhone] = await Promise.all([
-            value.email != null ? this._hash(value.email) : null,
-            value.phone != null ? this._hash(value.phone) : null
+            value.email != null ? this.hash(value.email) : null,
+            value.phone != null ? this.hash(value.phone) : null
         ]);
 
         const updatedValue = { ...value, email: updatedEmail, phone: updatedPhone };
         await this.setValidationResult({ value: updatedValue });
     }
 
-    async _hash(value) {
+    async hash(value) {
         return createHash('blake2b512').update(value).digest('hex');
     }
 }
