@@ -138,7 +138,7 @@ const partnerFlowSampleUsage = async (partnerClient) => {
             userPK: userPK,
             secretKey: secretKey,
       });
-      const phoneHash = partnerClient.has(getData.phone);
+      const phoneHash = partnerClient.hash(getData.phone);
 
       if (phoneValidationResult !== phoneHash) {
             // Reject order if phone not verified
@@ -154,7 +154,7 @@ const partnerFlowSampleUsage = async (partnerClient) => {
             userPK: userPK,
       });
 
-      const emailHash = partnerClient.has(getData.email);
+      const emailHash = partnerClient.hash(getData.email);
       if (emailValidationResult !== emailHash) {
             // Reject order if email not verified
             await partnerClient.rejectOrder(orderId, 'Email not verified');
