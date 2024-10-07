@@ -115,7 +115,7 @@ const complexUsage = async (partnerClient) => {
           secretKey: secretKey,
           userPK: userPK,
       });
-      if (!kyc.includes('passed')) {
+      if (!kyc?.includes('passed')) {
           //reason = 'KYC not completed';
           //await partnerClient.rejectOrder(orderId, reason);
           return;
