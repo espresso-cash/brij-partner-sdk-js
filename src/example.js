@@ -105,9 +105,10 @@ const partnerFlowSampleUsage = async () => {
 
       // 0. If you don't have a seed, generate one and save it
       const generatedKeyPair = await KycPartnerClient.generateKeyPair();
+      const seed = generatedKeyPair.seed;
 
       // 1. Initialize partner client with your auth key pair
-      const authKeyPair = nacl.sign.keyPair.fromSeed(base58.decode(generatedKeyPair.seed));
+      const authKeyPair = nacl.sign.keyPair.fromSeed(base58.decode(seed));
       const partnerClient = new KycPartnerClient({
             authKeyPair: {
                   async getPrivateKeyBytes() {
@@ -119,6 +120,10 @@ const partnerFlowSampleUsage = async () => {
             },
             baseUrl: 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app',
       });
+
+      // Initialize partner client
+      await partnerClient.init();
+
 
       // Mock user and order id
       const userPK = 'C93mPv5wjbEuPvHkXXbWK4EDv9QDKhGMkUgxtdWUEVXP';
@@ -144,20 +149,21 @@ const partnerFlowSampleUsage = async () => {
       }
 
       // 4. Get phone validation result
-      // Email and phone validation result are stored with hash
-      // Compare validation result hash with the hash of value stored in the user data
       const phoneValidationResult = await partnerClient.getValidationResult({
             key: 'phone',
             secretKey: secretKey,
             userPK: userPK,
       });
 
+      // Can fetch user data from backend if needed
       const getData = await partnerClient.getData({
             userPK: userPK,
             secretKey: secretKey,
       });
-      const phoneHash = partnerClient.hash(getData.phone);
 
+      // Email and phone validation result are stored with hash
+      // Compare validation result hash with the hash of value stored in the user data
+      const phoneHash = partnerClient.hash(getData.phone);
       if (phoneValidationResult !== phoneHash) {
             // Reject order if phone not verified
             await partnerClient.rejectOrder(orderId, 'Phone not verified');
