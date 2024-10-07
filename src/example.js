@@ -99,17 +99,35 @@ const orderUsage = async (partnerClient) => {
       });
 }
 
-const partnerFlowSampleUsage = async (partnerClient) => {
-      // 0. Mocked user and order
+// Example of how to use the partner flow
+const partnerFlowSampleUsage = async () => {
+      console.log('--- Webhook Example Usage ---');
+
+      // 0. If you don't have a seed, generate one and save it
+      const generatedKeyPair = await KycPartnerClient.generateKeyPair();
+
+      // 1. Initialize partner client with your auth key pair
+      const authKeyPair = nacl.sign.keyPair.fromSeed(base58.decode(generatedKeyPair.seed));
+      const partnerClient = new KycPartnerClient({
+            authKeyPair: {
+                  async getPrivateKeyBytes() {
+                        return authKeyPair.secretKey;
+                  },
+                  async getPublicKeyBytes() {
+                        return authKeyPair.publicKey;
+                  }
+            },
+            baseUrl: 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app',
+      });
+
+      // Mock user and order id
       const userPK = 'C93mPv5wjbEuPvHkXXbWK4EDv9QDKhGMkUgxtdWUEVXP';
       const orderId = '1a0502d4-b597-448c-a595-68cda906e5b7';
 
-      console.log('--- Webhook Example Usage ---');
-
-      // 1. Get user secret key 
+      // 2. Get user secret key 
       const secretKey = await partnerClient.getUserSecretKey(userPK);
 
-      // 2. Get KYC result
+      // 3. Get KYC result
       const kycValidationResult = await partnerClient.getValidationResult({
             key: 'kycSmileId',
             secretKey: secretKey,
@@ -125,7 +143,7 @@ const partnerFlowSampleUsage = async (partnerClient) => {
             return;
       }
 
-      // 3. Get phone validation result
+      // 4. Get phone validation result
       // Email and phone validation result are stored with hash
       // Compare validation result hash with the hash of value stored in the user data
       const phoneValidationResult = await partnerClient.getValidationResult({
@@ -147,13 +165,12 @@ const partnerFlowSampleUsage = async (partnerClient) => {
             return;
       }
 
-      // 4. Get email validation result
+      // 5. Get email validation result
       const emailValidationResult = await partnerClient.getValidationResult({
             key: 'email',
             secretKey: secretKey,
             userPK: userPK,
       });
-
       const emailHash = partnerClient.hash(getData.email);
       if (emailValidationResult !== emailHash) {
             // Reject order if email not verified
@@ -162,17 +179,17 @@ const partnerFlowSampleUsage = async (partnerClient) => {
             return;
       }
 
-      // 5. Get order details
+      // 6. Get order details
       const order = await partnerClient.getOrder(orderId);
       const cryptoAmount = order.cryptoAmount;
       const cryptoCurrency = order.cryptoCurrency;
       const fiatAmount = order.fiatAmount;
       const fiatCurrency = order.fiatCurrency;
-      // 6. Do sanity checks on the order, confirm if you can process the order
+      // 7. Do sanity checks on the order, confirm if you can process the order
 
 
-      // 7. If you can't process the order, reject the order
-      // 8. If you can process the order, accept the order
+      // 8. If you can't process the order, reject the order
+      // 9. If you can process the order, accept the order
       await partnerClient.acceptOrder(orderId);
 }
 
@@ -181,7 +198,6 @@ const partnerFlowSampleUsage = async (partnerClient) => {
             const partnerClient = await initializeClient();
             await apiUsage(partnerClient);
             await orderUsage(partnerClient);
-            // await partnerFlowSampleUsage(partnerClient);
       } catch (error) {
             console.error('Error:', error);
       }
