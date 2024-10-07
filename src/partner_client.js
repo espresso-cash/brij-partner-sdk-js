@@ -159,49 +159,6 @@ class KycPartnerClient {
         return new TextDecoder().decode(decrypted);
     }
 
-    async processOrder({ secretKey, userPK, orderId }) {
-        var reason = '';
-
-        const kyc = await this.getValidationResult({
-            key: 'kycSmileId',
-            secretKey: secretKey,
-            userPK: userPK,
-        });
-        if (!kyc.includes('passed')) {
-            reason = 'KYC not completed';
-            await this.rejectOrder(orderId, reason);
-            return;
-        }
-
-        const phone = await this.getValidationResult({
-            key: 'phone',
-            secretKey: secretKey,
-            userPK: userPK,
-        });
-        if (phone.trim().length === 0) {
-            reason = 'Phone not verified';
-            await this.rejectOrder(orderId, reason);
-            return;
-        }
-
-        const email = await this.getValidationResult({
-            key: 'email',
-            secretKey: secretKey,
-            userPK: userPK,
-        });
-        if (email.trim().length === 0) {
-            reason = 'Email not verified';
-            await this.rejectOrder(orderId, reason);
-            return;
-        }
-
-        // Todo:
-        // amount is in a specific range
-        // exchange rate is good
-
-        await this.acceptOrder(orderId);
-    }
-
     async getOrder(orderId) {
         const response = await this._apiClient.post('/v1/getOrder', {
             orderId: orderId,

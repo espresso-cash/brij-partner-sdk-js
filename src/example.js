@@ -101,8 +101,49 @@ const orderUsage = async (partnerClient) => {
 }
 
 const complexUsage = async (partnerClient) => {
+      const userPK = 'C93mPv5wjbEuPvHkXXbWK4EDv9QDKhGMkUgxtdWUEVXP';
+
+      const secretKey = await partnerClient.getUserSecretKey(userPK);
+
+      //const orderId = '1a0502d4-b597-448c-a595-68cda906e5b7';
+
       console.log('--- Webhook Usage ---');
-      //TODO add webhook example
+      //var reason = '';
+
+      const kyc = await partnerClient.getValidationResult({
+          key: 'kycSmileId',
+          secretKey: secretKey,
+          userPK: userPK,
+      });
+      if (!kyc.includes('passed')) {
+          //reason = 'KYC not completed';
+          //await partnerClient.rejectOrder(orderId, reason);
+          return;
+      }
+
+      const phone = await partnerClient.getValidationResult({
+          key: 'phone',
+          secretKey: secretKey,
+          userPK: userPK,
+      });
+      if (!phone?.trim()) {
+          //reason = 'Phone not verified';
+          //await partnerClient.rejectOrder(orderId, reason);
+          return;
+      }
+
+      const email = await partnerClient.getValidationResult({
+          key: 'email',
+          secretKey: secretKey,
+          userPK: userPK,
+      });
+      if (!email?.trim()) {
+          //reason = 'Email not verified';
+          //await partnerClient.rejectOrder(orderId, reason);
+          return;
+      }
+
+      //await partnerClient.acceptOrder(orderId);
 }
 
 (async () => {
