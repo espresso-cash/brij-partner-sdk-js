@@ -72,25 +72,24 @@ const orderUsage = async (partnerClient) => {
       let order = await partnerClient.getOrder(orderId);
       console.log('fetch order:', order);
 
+      // Accept order
       // await partnerClient.acceptOrder(orderId);
       // console.log('acceptOrder Done');
-      // order = await partnerClient.getOrder(orderId);
-      // console.log('updated order:', order);
 
-      // await partnerClient.completeOrder(orderId);
-      // console.log('completeOrder Done');
-      // order = await partnerClient.getOrder(orderId);
-      // console.log('updated order:', order);
-
-      // await partnerClient.failOrder(orderId);
-      // console.log('failOrder Done');
-      // order = await partnerClient.getOrder(orderId);
-      // console.log('updated order:', order);
-
+      // Reject order
       // await partnerClient.rejectOrder(orderId);
       // console.log('rejectOrder Done');
-      // order = await partnerClient.getOrder(orderId);
-      // console.log('updated order:', order);
+
+      // Complete order
+      // await partnerClient.completeOrder(orderId);
+      // console.log('completeOrder Done');
+
+      // Fail order
+      // await partnerClient.failOrder(orderId);
+      // console.log('failOrder Done');
+
+      order = await partnerClient.getOrder(orderId);
+      console.log('updated order:', order);
 
       const ordersResponse = await partnerClient.getPartnerOrders();
       console.log('Partner orders:');
@@ -100,50 +99,71 @@ const orderUsage = async (partnerClient) => {
       });
 }
 
-const complexUsage = async (partnerClient) => {
+const partnerFlowSampleUsage = async (partnerClient) => {
+      // 0. Mocked user and order
       const userPK = 'C93mPv5wjbEuPvHkXXbWK4EDv9QDKhGMkUgxtdWUEVXP';
+      const orderId = '1a0502d4-b597-448c-a595-68cda906e5b7';
 
+      console.log('--- Webhook Example Usage ---');
+
+      // 1. Get user secret key 
       const secretKey = await partnerClient.getUserSecretKey(userPK);
 
-      //const orderId = '1a0502d4-b597-448c-a595-68cda906e5b7';
-
-      console.log('--- Webhook Usage ---');
-      //var reason = '';
-
+      // 2. Get KYC result
       const kyc = await partnerClient.getValidationResult({
-          key: 'kycSmileId',
-          secretKey: secretKey,
-          userPK: userPK,
+            key: 'kycSmileId',
+            secretKey: secretKey,
+            userPK: userPK,
       });
+
+      // KYC should return JSON result of validation. Ie: for Nigeria, it is SmileID result
+      // You can do more validation of user here
       if (!kyc?.includes('passed')) {
-          //reason = 'KYC not completed';
-          //await partnerClient.rejectOrder(orderId, reason);
-          return;
+            // Reject order if KYC not completed
+            await partnerClient.rejectOrder(orderId, 'KYC not completed');
+
+            return;
       }
 
+      // 3. Get phone validation result
       const phone = await partnerClient.getValidationResult({
-          key: 'phone',
-          secretKey: secretKey,
-          userPK: userPK,
+            key: 'phone',
+            secretKey: secretKey,
+            userPK: userPK,
       });
+
       if (!phone?.trim()) {
-          //reason = 'Phone not verified';
-          //await partnerClient.rejectOrder(orderId, reason);
-          return;
+            // Reject order if phone not verified
+            await partnerClient.rejectOrder(orderId, 'Phone not verified');
+
+            return;
       }
 
+      // 4. Get email validation result
       const email = await partnerClient.getValidationResult({
-          key: 'email',
-          secretKey: secretKey,
-          userPK: userPK,
+            key: 'email',
+            secretKey: secretKey,
+            userPK: userPK,
       });
       if (!email?.trim()) {
-          //reason = 'Email not verified';
-          //await partnerClient.rejectOrder(orderId, reason);
-          return;
+            // Reject order if email not verified
+            await partnerClient.rejectOrder(orderId, 'Email not verified');
+
+            return;
       }
 
-      //await partnerClient.acceptOrder(orderId);
+      // 5. Get order details
+      const order = await partnerClient.getOrder(orderId);
+      const cryptoAmount = order.cryptoAmount;
+      const cryptoCurrency = order.cryptoCurrency;
+      const fiatAmount = order.fiatAmount;
+      const fiatCurrency = order.fiatCurrency;
+      // 6. Do sanity checks on the order, confirm if you can process the order
+
+
+      // 7. If you can't process the order, reject the order
+      // 8. If you can process the order, accept the order
+      await partnerClient.acceptOrder(orderId);
 }
 
 (async () => {
@@ -151,7 +171,7 @@ const complexUsage = async (partnerClient) => {
             const partnerClient = await initializeClient();
             await apiUsage(partnerClient);
             await orderUsage(partnerClient);
-            await complexUsage(partnerClient);
+            // await partnerFlowSampleUsage(partnerClient);
       } catch (error) {
             console.error('Error:', error);
       }
