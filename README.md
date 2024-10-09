@@ -8,7 +8,7 @@ npm install https://github.com/espresso-cash/xflow-partner-client
 
 ## Register your Partner's Public Key
 
-Create your key pair using the `KycPartnerClient.generateKeyPair()` method. Store the seed returned by this method in a safe place.
+Create your key pair using the `XFlowPartnerClient.generateKeyPair()` method. Store the seed returned by this method in a safe place.
 
 Provide us with the following information to register you in the system:
 
@@ -21,7 +21,7 @@ Provide us with the following information to register you in the system:
 Using the generated `seed`, initialize the client:
 
 ```Javascript
-const client = await KycPartnerClient.fromSeed(seed);
+const client = await XFlowPartnerClient.fromSeed(seed);
 ```
 
 ## React to an Order
