@@ -175,15 +175,17 @@ class XFlowPartnerClient {
         return response.data;
     }
 
-    async acceptOnRampOrder({orderId, bankName, bankAccount}: {
+    async acceptOnRampOrder({orderId, bankName, bankAccount, externalId}: {
         orderId: string,
         bankName: string,
-        bankAccount: string
+        bankAccount: string,
+        externalId: string,
     }) {
         await this._apiClient!.post('/v1/acceptOrder', {
             orderId: orderId,
             bankName: bankName,
             bankAccount: bankAccount,
+            externalId: externalId,
         });
     }
 
@@ -194,13 +196,15 @@ class XFlowPartnerClient {
         });
     }
 
-    async acceptOffRampOrder({orderId, cryptoWalletAddress}: {
+    async acceptOffRampOrder({orderId, cryptoWalletAddress, externalId}: {
         orderId: string,
         cryptoWalletAddress: string,
+        externalId: string,
     }) {
         await this._apiClient!.post('/v1/acceptOrder', {
             orderId: orderId,
             cryptoWalletAddress: cryptoWalletAddress,
+            externalId: externalId,
         });
     }
 
