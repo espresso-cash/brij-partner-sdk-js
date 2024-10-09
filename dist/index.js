@@ -137,6 +137,17 @@ class XFlowPartnerClient {
             transactionId: transactionId,
         });
     }
+    async acceptOffRampOrder({ orderId, cryptoWalletAddress }) {
+        await this._apiClient.post('/v1/acceptOrder', {
+            orderId: orderId,
+            cryptoWalletAddress: cryptoWalletAddress,
+        });
+    }
+    async completeOffRampOrder({ orderId }) {
+        await this._apiClient.post('/v1/completeOrder', {
+            orderId: orderId,
+        });
+    }
     async failOrder({ orderId, reason }) {
         await this._apiClient.post('/v1/failOrder', {
             orderId: orderId,

@@ -37,6 +37,13 @@ declare class XFlowPartnerClient {
         orderId: string;
         transactionId: string;
     }): Promise<void>;
+    acceptOffRampOrder({ orderId, cryptoWalletAddress }: {
+        orderId: string;
+        cryptoWalletAddress: string;
+    }): Promise<void>;
+    completeOffRampOrder({ orderId }: {
+        orderId: string;
+    }): Promise<void>;
     failOrder({ orderId, reason }: {
         orderId: string;
         reason: string;
