@@ -48,10 +48,10 @@ class XFlowPartnerClient {
     }
     async init() {
         await Promise.all([
-            this._generateAuthToken(),
+            this.generateAuthToken(),
         ]);
     }
-    async _generateAuthToken() {
+    async generateAuthToken() {
         const [publicKeyBytes, privateKeyBytes] = await Promise.all([
             this.authKeyPair.getPublicKeyBytes(),
             this.authKeyPair.getPrivateKeyBytes()
@@ -73,7 +73,7 @@ class XFlowPartnerClient {
             headers: { 'Authorization': `Bearer ${this._token}` }
         });
     }
-    async _decryptData(encryptedMessage, key) {
+    async decryptData(encryptedMessage, key) {
         const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
         const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
         const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
@@ -95,7 +95,7 @@ class XFlowPartnerClient {
             if (!message) {
                 throw new Error(`Invalid signature for key: ${key}`);
             }
-            const decrypted = await this._decryptData(message, secret);
+            const decrypted = await this.decryptData(message, secret);
             return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
         }));
         return Object.fromEntries(data);
@@ -111,10 +111,10 @@ class XFlowPartnerClient {
         const secret = base58.decode(secretKey);
         const signedMessage = naclUtil.decodeBase64(data);
         const message = signedMessage.slice(nacl.sign.signatureLength);
-        const decrypted = await this._decryptData(message, secret);
+        const decrypted = await this.decryptData(message, secret);
         return Buffer.from(decrypted).toString('hex');
     }
-    async getOrder({ orderId, externalId }) {
+    async getOrder({ externalId, orderId }) {
         const response = await this._apiClient.post('/v1/getOrder', {
             orderId: orderId,
             externalId: externalId,

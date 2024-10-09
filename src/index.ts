@@ -19,6 +19,31 @@ interface XFlowPartnerClientOptions {
     baseUrl?: string;
 }
 
+export type OrderIds = { orderId: string, externalId?: '' } | { orderId?: '', externalId: string };
+
+export type CompleteOnRampOrderParams = OrderIds & { transactionId: string };
+
+export type FailOrderParams = OrderIds & { reason: string };
+
+export type AcceptOnRampOrderParams = {
+    orderId: string,
+    bankName: string,
+    bankAccount: string,
+    externalId?: string,
+};
+
+export type AcceptOffRampOrderParams = {
+    orderId: string,
+    cryptoWalletAddress: string,
+    externalId?: string,
+};
+
+export type RejectOrderParams = { orderId: string, reason: string };
+
+export type DataAccessParams = { userPK: string, secretKey: string };
+
+export type GetValidationResultParams = DataAccessParams & { key: string };
+
 class XFlowPartnerClient {
     private authKeyPair: AuthKeyPair;
     private readonly baseUrl: string;
@@ -68,11 +93,11 @@ class XFlowPartnerClient {
 
     private async init() {
         await Promise.all([
-            this._generateAuthToken(),
+            this.generateAuthToken(),
         ]);
     }
 
-    private async _generateAuthToken() {
+    private async generateAuthToken() {
         const [publicKeyBytes, privateKeyBytes] = await Promise.all([
             this.authKeyPair.getPublicKeyBytes(),
             this.authKeyPair.getPrivateKeyBytes()
@@ -104,7 +129,7 @@ class XFlowPartnerClient {
         });
     }
 
-    private async _decryptData(encryptedMessage: Uint8Array, key: Uint8Array) {
+    private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array) {
         const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
         const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
 
@@ -117,7 +142,7 @@ class XFlowPartnerClient {
         return decrypted;
     }
 
-    async getData({userPK, secretKey}: { userPK: string, secretKey: string }) {
+    async getData({userPK, secretKey}: DataAccessParams) {
         const response = await this._apiClient!.post('/v1/getData', {publicKey: userPK});
         const responseData = response.data.data as [string, string];
 
@@ -135,7 +160,7 @@ class XFlowPartnerClient {
                     throw new Error(`Invalid signature for key: ${key}`);
                 }
 
-                const decrypted = await this._decryptData(message, secret);
+                const decrypted = await this.decryptData(message, secret);
                 return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
             })
         );
@@ -143,7 +168,7 @@ class XFlowPartnerClient {
         return Object.fromEntries(data);
     }
 
-    async getValidationResult({key, secretKey, userPK}: { key: string, secretKey: string, userPK: string }) {
+    async getValidationResult({key, secretKey, userPK}: GetValidationResultParams) {
         const response = await this._apiClient!.post('/v1/getValidationResult', {
             userPublicKey: userPK,
             validatorPublicKey: this._authPublicKey,
@@ -157,11 +182,11 @@ class XFlowPartnerClient {
         const signedMessage = naclUtil.decodeBase64(data);
         const message = signedMessage.slice(nacl.sign.signatureLength);
 
-        const decrypted = await this._decryptData(message, secret);
+        const decrypted = await this.decryptData(message, secret);
         return Buffer.from(decrypted).toString('hex');
     }
 
-    async getOrder({orderId, externalId}: { orderId: string, externalId: string }) {
+    async getOrder({externalId, orderId}: OrderIds) {
         const response = await this._apiClient!.post('/v1/getOrder', {
             orderId: orderId,
             externalId: externalId,
@@ -176,12 +201,7 @@ class XFlowPartnerClient {
         return response.data;
     }
 
-    async acceptOnRampOrder({orderId, bankName, bankAccount, externalId}: {
-        orderId: string,
-        bankName: string,
-        bankAccount: string,
-        externalId: string,
-    }) {
+    async acceptOnRampOrder({orderId, bankName, bankAccount, externalId}: AcceptOnRampOrderParams) {
         await this._apiClient!.post('/v1/acceptOrder', {
             orderId: orderId,
             bankName: bankName,
@@ -190,7 +210,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async completeOnRampOrder({orderId, transactionId, externalId}: { orderId: string, transactionId: string, externalId: string }) {
+    async completeOnRampOrder({orderId, transactionId, externalId}: CompleteOnRampOrderParams) {
         await this._apiClient!.post('/v1/completeOrder', {
             orderId: orderId,
             transactionId: transactionId,
@@ -198,11 +218,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async acceptOffRampOrder({orderId, cryptoWalletAddress, externalId}: {
-        orderId: string,
-        cryptoWalletAddress: string,
-        externalId: string,
-    }) {
+    async acceptOffRampOrder({orderId, cryptoWalletAddress, externalId}: AcceptOffRampOrderParams) {
         await this._apiClient!.post('/v1/acceptOrder', {
             orderId: orderId,
             cryptoWalletAddress: cryptoWalletAddress,
@@ -210,14 +226,14 @@ class XFlowPartnerClient {
         });
     }
 
-    async completeOffRampOrder({orderId, externalId}: { orderId: string, externalId: string }) {
+    async completeOffRampOrder({orderId, externalId}: OrderIds) {
         await this._apiClient!.post('/v1/completeOrder', {
             orderId: orderId,
             externalId: externalId,
         });
     }
 
-    async failOrder({orderId, reason, externalId}: { orderId: string, reason: string, externalId: string }) {
+    async failOrder({orderId, reason, externalId}: FailOrderParams) {
         await this._apiClient!.post('/v1/failOrder', {
             orderId: orderId,
             reason: reason,
@@ -225,7 +241,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async rejectOrder({orderId, reason}: { orderId: string, reason: string }) {
+    async rejectOrder({orderId, reason}: RejectOrderParams) {
         await this._apiClient!.post('/v1/rejectOrder', {
             orderId: orderId,
             reason: reason
@@ -268,11 +284,11 @@ class XFlowPartnerClient {
         return base58.encode(decryptedSecretKey);
     }
 
-    async hash(value: string) {
+    private async hash(value: string) {
         return createHash('sha256').update(value).digest('hex');
     }
 
-    async getEmail({userPK, secretKey}: { userPK: string, secretKey: string }) {
+    async getEmail({userPK, secretKey}: DataAccessParams) {
         const [userData, validationResult] = await Promise.all([
             this.getData({userPK, secretKey}),
             this.getValidationResult({key: 'email', secretKey, userPK})
@@ -288,7 +304,7 @@ class XFlowPartnerClient {
         };
     }
 
-    async getPhone({userPK, secretKey}: { userPK: string, secretKey: string }) {
+    async getPhone({userPK, secretKey}: DataAccessParams) {
         const [userData, validationResult] = await Promise.all([
             this.getData({userPK, secretKey}),
             this.getValidationResult({key: 'phone', secretKey, userPK})

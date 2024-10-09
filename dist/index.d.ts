@@ -1,3 +1,38 @@
+export type OrderIds = {
+    orderId: string;
+    externalId?: '';
+} | {
+    orderId?: '';
+    externalId: string;
+};
+export type CompleteOnRampOrderParams = OrderIds & {
+    transactionId: string;
+};
+export type FailOrderParams = OrderIds & {
+    reason: string;
+};
+export type AcceptOnRampOrderParams = {
+    orderId: string;
+    bankName: string;
+    bankAccount: string;
+    externalId?: string;
+};
+export type AcceptOffRampOrderParams = {
+    orderId: string;
+    cryptoWalletAddress: string;
+    externalId?: string;
+};
+export type RejectOrderParams = {
+    orderId: string;
+    reason: string;
+};
+export type DataAccessParams = {
+    userPK: string;
+    secretKey: string;
+};
+export type GetValidationResultParams = DataAccessParams & {
+    key: string;
+};
 declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;
@@ -15,65 +50,26 @@ declare class XFlowPartnerClient {
     }>;
     static fromSeed(seed: string): Promise<XFlowPartnerClient>;
     private init;
-    private _generateAuthToken;
-    private _decryptData;
-    getData({ userPK, secretKey }: {
-        userPK: string;
-        secretKey: string;
-    }): Promise<any>;
-    getValidationResult({ key, secretKey, userPK }: {
-        key: string;
-        secretKey: string;
-        userPK: string;
-    }): Promise<string | null>;
-    getOrder({ orderId, externalId }: {
-        orderId: string;
-        externalId: string;
-    }): Promise<any>;
+    private generateAuthToken;
+    private decryptData;
+    getData({ userPK, secretKey }: DataAccessParams): Promise<any>;
+    getValidationResult({ key, secretKey, userPK }: GetValidationResultParams): Promise<string | null>;
+    getOrder({ externalId, orderId }: OrderIds): Promise<any>;
     getPartnerOrders(): Promise<any>;
-    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: {
-        orderId: string;
-        bankName: string;
-        bankAccount: string;
-        externalId: string;
-    }): Promise<void>;
-    completeOnRampOrder({ orderId, transactionId, externalId }: {
-        orderId: string;
-        transactionId: string;
-        externalId: string;
-    }): Promise<void>;
-    acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: {
-        orderId: string;
-        cryptoWalletAddress: string;
-        externalId: string;
-    }): Promise<void>;
-    completeOffRampOrder({ orderId, externalId }: {
-        orderId: string;
-        externalId: string;
-    }): Promise<void>;
-    failOrder({ orderId, reason, externalId }: {
-        orderId: string;
-        reason: string;
-        externalId: string;
-    }): Promise<void>;
-    rejectOrder({ orderId, reason }: {
-        orderId: string;
-        reason: string;
-    }): Promise<void>;
+    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void>;
+    completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void>;
+    acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void>;
+    completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void>;
+    failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void>;
+    rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
-    hash(value: string): Promise<string>;
-    getEmail({ userPK, secretKey }: {
-        userPK: string;
-        secretKey: string;
-    }): Promise<{
+    private hash;
+    getEmail({ userPK, secretKey }: DataAccessParams): Promise<{
         value: any;
         verified: boolean;
     }>;
-    getPhone({ userPK, secretKey }: {
-        userPK: string;
-        secretKey: string;
-    }): Promise<{
+    getPhone({ userPK, secretKey }: DataAccessParams): Promise<{
         value: any;
         verified: boolean;
     }>;
