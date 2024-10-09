@@ -114,9 +114,10 @@ class XFlowPartnerClient {
         const decrypted = await this._decryptData(message, secret);
         return Buffer.from(decrypted).toString('hex');
     }
-    async getOrder(orderId) {
+    async getOrder({ orderId, externalId }) {
         const response = await this._apiClient.post('/v1/getOrder', {
             orderId: orderId,
+            externalId: externalId,
         });
         return response.data;
     }
@@ -132,10 +133,11 @@ class XFlowPartnerClient {
             externalId: externalId,
         });
     }
-    async completeOnRampOrder({ orderId, transactionId }) {
+    async completeOnRampOrder({ orderId, transactionId, externalId }) {
         await this._apiClient.post('/v1/completeOrder', {
             orderId: orderId,
             transactionId: transactionId,
+            externalId: externalId,
         });
     }
     async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
@@ -145,15 +147,17 @@ class XFlowPartnerClient {
             externalId: externalId,
         });
     }
-    async completeOffRampOrder({ orderId }) {
+    async completeOffRampOrder({ orderId, externalId }) {
         await this._apiClient.post('/v1/completeOrder', {
             orderId: orderId,
+            externalId: externalId,
         });
     }
-    async failOrder({ orderId, reason }) {
+    async failOrder({ orderId, reason, externalId }) {
         await this._apiClient.post('/v1/failOrder', {
             orderId: orderId,
-            reason: reason
+            reason: reason,
+            externalId: externalId,
         });
     }
     async rejectOrder({ orderId, reason }) {

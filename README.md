@@ -57,7 +57,7 @@ An order has the following structure:
   "cryptoWalletAddress": "",
   "transaction": "",
   "transactionId": "",
-  "externalId": "",
+  "externalId": ""
 }
 ```
 

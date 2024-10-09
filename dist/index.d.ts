@@ -26,7 +26,10 @@ declare class XFlowPartnerClient {
         secretKey: string;
         userPK: string;
     }): Promise<string | null>;
-    getOrder(orderId: string): Promise<any>;
+    getOrder({ orderId, externalId }: {
+        orderId: string;
+        externalId: string;
+    }): Promise<any>;
     getPartnerOrders(): Promise<any>;
     acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: {
         orderId: string;
@@ -34,21 +37,24 @@ declare class XFlowPartnerClient {
         bankAccount: string;
         externalId: string;
     }): Promise<void>;
-    completeOnRampOrder({ orderId, transactionId }: {
+    completeOnRampOrder({ orderId, transactionId, externalId }: {
         orderId: string;
         transactionId: string;
+        externalId: string;
     }): Promise<void>;
     acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: {
         orderId: string;
         cryptoWalletAddress: string;
         externalId: string;
     }): Promise<void>;
-    completeOffRampOrder({ orderId }: {
+    completeOffRampOrder({ orderId, externalId }: {
         orderId: string;
+        externalId: string;
     }): Promise<void>;
-    failOrder({ orderId, reason }: {
+    failOrder({ orderId, reason, externalId }: {
         orderId: string;
         reason: string;
+        externalId: string;
     }): Promise<void>;
     rejectOrder({ orderId, reason }: {
         orderId: string;

@@ -161,9 +161,10 @@ class XFlowPartnerClient {
         return Buffer.from(decrypted).toString('hex');
     }
 
-    async getOrder(orderId: string) {
+    async getOrder({orderId, externalId}: { orderId: string, externalId: string }) {
         const response = await this._apiClient!.post('/v1/getOrder', {
             orderId: orderId,
+            externalId: externalId,
         });
 
         return response.data;
@@ -189,10 +190,11 @@ class XFlowPartnerClient {
         });
     }
 
-    async completeOnRampOrder({orderId, transactionId}: { orderId: string, transactionId: string }) {
+    async completeOnRampOrder({orderId, transactionId, externalId}: { orderId: string, transactionId: string, externalId: string }) {
         await this._apiClient!.post('/v1/completeOrder', {
             orderId: orderId,
             transactionId: transactionId,
+            externalId: externalId,
         });
     }
 
@@ -208,16 +210,18 @@ class XFlowPartnerClient {
         });
     }
 
-    async completeOffRampOrder({orderId}: { orderId: string }) {
+    async completeOffRampOrder({orderId, externalId}: { orderId: string, externalId: string }) {
         await this._apiClient!.post('/v1/completeOrder', {
             orderId: orderId,
+            externalId: externalId,
         });
     }
 
-    async failOrder({orderId, reason}: { orderId: string, reason: string }) {
+    async failOrder({orderId, reason, externalId}: { orderId: string, reason: string, externalId: string }) {
         await this._apiClient!.post('/v1/failOrder', {
             orderId: orderId,
-            reason: reason
+            reason: reason,
+            externalId: externalId,
         });
     }
 
