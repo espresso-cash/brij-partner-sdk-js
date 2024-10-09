@@ -125,7 +125,7 @@ console.log(phone); // { value: '+1234567890', verified: false }
 
 ### Accepting and Completing the On-Ramp Order
 
-If, based on the user and order information, you’re ready to proceed with the order, you should accept it and specify the bank name, bank account information and external ID:
+If, based on the user and order information, you’re ready to proceed with the order, you should accept it and specify the bank name, bank account information. You can also pass your internal order ID in the parameter as a reference:
 
 ```Javascript
 await client.acceptOnRampOrder({
@@ -154,8 +154,8 @@ console.log(info.walletAddress); // EJpGLU94vxBHDFhN9sYwkQmrfTeFNpVViyy2EVaGbUky
 
 ### Accepting and Completing the Off-Ramp Order
 
-Similar to On-Ramp order, once you’re ready to proceed, you should accept it and specify 
-the crypto wallet address and and external ID:
+Similar to On-Ramp order, once you’re ready to proceed, you should accept it and specify
+the crypto wallet address and external ID:
 
 ```Javascript
 await client.acceptOffRampOrder({
