@@ -56,9 +56,9 @@ An order has the following structure:
   "bankAccount": "",
   "cryptoWalletAddress": "",
   "transaction": "",
-  "transactionId": ""
+  "transactionId": "",
+  "externalId": "",
 }
-
 ```
 
 ### Getting User Data
@@ -70,7 +70,7 @@ const secretKey = await client.getUserSecretKey(order.userPublicKey);
 console.log('userSecretKey:', secretKey);
 ```
 
-> [!WARNING] 
+> [!WARNING]
 > Do not store this key in your database; instead, use the SDK to retrieve it when needed.
 
 Using this key, you can access the user’s raw information:
@@ -126,13 +126,14 @@ console.log(phone); // { value: '+1234567890', verified: false }
 
 ### Accepting and Completing the On-Ramp Order
 
-If, based on the user and order information, you’re ready to proceed with the order, you should accept it and specify the bank name and bank account information:
+If, based on the user and order information, you’re ready to proceed with the order, you should accept it and specify the bank name, bank account information. You can also pass your internal order ID in the parameter as a reference:
 
 ```Javascript
 await client.acceptOnRampOrder({
     orderId: order.orderId,
     bankName: 'BANK_NAME',
     bankAccount: 'BANK_ACCOUNT',
+    externalId: 'EXTERNAL_ID',
 });
 ```
 
@@ -150,6 +151,35 @@ You can fetch the user’s wallet address using the following code:
 ```Javascript
 const info = await client.getUserInfo(order.userPublicKey);
 console.log(info.walletAddress); // EJpGLU94vxBHDFhN9sYwkQmrfTeFNpVViyy2EVaGbUky
+```
+
+### Accepting and Completing the Off-Ramp Order
+
+Similar to On-Ramp order, once you’re ready to proceed, you should accept it and specify
+the crypto wallet address and external ID:
+
+```Javascript
+await client.acceptOffRampOrder({
+    orderId: order.orderId,
+    cryptoWalletAddress: 'CRYPTO_WALLET_ADDRESS',
+    externalId: 'EXTERNAL_ID',
+});
+```
+
+Once you’ve received the payment, transfer fiat to the user’s bank account and complete the order.
+
+```Javascript
+await client.completeOffRampOrder({
+    orderId: order.orderId,
+});
+```
+
+You can fetch the user’s bank details using the following code:
+
+```Javascript
+const order = await client.getOrder(response.orderId);
+console.log(order.bankName); // TEST BANK
+console.log(order.bankAccount); // 12345678
 ```
 
 ### Rejecting the Order

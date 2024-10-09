@@ -124,17 +124,30 @@ class XFlowPartnerClient {
         const response = await this._apiClient.post('/v1/getPartnerOrders');
         return response.data;
     }
-    async acceptOnRampOrder({ orderId, bankName, bankAccount }) {
+    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }) {
         await this._apiClient.post('/v1/acceptOrder', {
             orderId: orderId,
             bankName: bankName,
             bankAccount: bankAccount,
+            externalId: externalId,
         });
     }
     async completeOnRampOrder({ orderId, transactionId }) {
         await this._apiClient.post('/v1/completeOrder', {
             orderId: orderId,
             transactionId: transactionId,
+        });
+    }
+    async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
+        await this._apiClient.post('/v1/acceptOrder', {
+            orderId: orderId,
+            cryptoWalletAddress: cryptoWalletAddress,
+            externalId: externalId,
+        });
+    }
+    async completeOffRampOrder({ orderId }) {
+        await this._apiClient.post('/v1/completeOrder', {
+            orderId: orderId,
         });
     }
     async failOrder({ orderId, reason }) {
