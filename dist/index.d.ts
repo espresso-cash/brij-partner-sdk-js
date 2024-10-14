@@ -53,7 +53,7 @@ declare class XFlowPartnerClient {
     private init;
     private generateAuthToken;
     private decryptData;
-    getData({ userPK, secretKey }: DataAccessParams): Promise<any>;
+    getData({ userPK, secretKey }: DataAccessParams): Promise<void>;
     getValidationResult({ key, secretKey, userPK }: GetValidationResultParams): Promise<string | null>;
     getOrder({ externalId, orderId }: OrderIds): Promise<any>;
     getPartnerOrders(): Promise<any>;
@@ -66,13 +66,7 @@ declare class XFlowPartnerClient {
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
     private hash;
-    getEmail({ userPK, secretKey }: DataAccessParams): Promise<{
-        value: any;
-        verified: boolean;
-    }>;
-    getPhone({ userPK, secretKey }: DataAccessParams): Promise<{
-        value: any;
-        verified: boolean;
-    }>;
+    getEmail({ userPK, secretKey }: DataAccessParams): Promise<void>;
+    getPhone({ userPK, secretKey }: DataAccessParams): Promise<void>;
 }
 export { XFlowPartnerClient };
