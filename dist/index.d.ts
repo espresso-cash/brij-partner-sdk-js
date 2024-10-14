@@ -33,6 +33,19 @@ export type DataAccessParams = {
 export type GetValidationResultParams = DataAccessParams & {
     key: string;
 };
+interface UserData {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    dob?: Date;
+    phone?: string;
+    idNumber?: string;
+    idType?: string;
+    bankAccountNumber?: string;
+    bankCode?: string;
+    bankName?: string;
+    selfie?: Uint8Array;
+}
 declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;
@@ -53,7 +66,7 @@ declare class XFlowPartnerClient {
     private init;
     private generateAuthToken;
     private decryptData;
-    getData({ userPK, secretKey }: DataAccessParams): Promise<void>;
+    getData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
     getValidationResult({ key, secretKey, userPK }: GetValidationResultParams): Promise<string | null>;
     getOrder({ externalId, orderId }: OrderIds): Promise<any>;
     getPartnerOrders(): Promise<any>;

@@ -8,8 +8,9 @@ import ed2curve from 'ed2curve';
 import * as protobuf from 'protobufjs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { WrappedData, documentTypeToJSON } from './generated/protos/data';
 
-const _baseURL = 'https://kyc-backend-beta-402681483920.europe-west1.run.app/';
+const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
 
 interface AuthKeyPair {
     getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -46,6 +47,20 @@ export type RejectOrderParams = { orderId: string, reason: string };
 export type DataAccessParams = { userPK: string, secretKey: string };
 
 export type GetValidationResultParams = DataAccessParams & { key: string };
+
+interface UserData {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    dob?: Date;
+    phone?: string;
+    idNumber?: string;
+    idType?: string;
+    bankAccountNumber?: string;
+    bankCode?: string;
+    bankName?: string;
+    selfie?: Uint8Array;
+}
 
 class XFlowPartnerClient {
     private authKeyPair: AuthKeyPair;
@@ -107,7 +122,7 @@ class XFlowPartnerClient {
             const __filename = fileURLToPath(import.meta.url)
             const __dirname = path.dirname(__filename)
             const protoPath = path.resolve(__dirname, '../protos/data.proto');
-            this._protoRoot = await protobuf.load(protoPath);
+            //this._protoRoot = await protobuf.load(protoPath);
         }
         console.log(this._protoRoot);
     }
@@ -157,31 +172,48 @@ class XFlowPartnerClient {
         return decrypted;
     }
 
-    async getData({ userPK, secretKey }: DataAccessParams) {
+    async getData({ userPK, secretKey }: DataAccessParams): Promise<UserData> {
         const response = await this._apiClient!.post('/v1/getUserData', { userPublicKey: userPK });
         const responseData = response.data.userData;
-        console.log('response in getData:', responseData);
 
-        // const verifyKey = base58.decode(userPK);
-        // const secret = base58.decode(secretKey);
+        const verifyKey = base58.decode(userPK);
+        const secret = base58.decode(secretKey);
 
-        // const data = await Promise.all(
-        //     Object.entries(responseData).map(async ([key, value]) => {
-        //         if (!value) return [key, ''];
+        let userData: UserData = {};
 
-        //         const signedMessage = naclUtil.decodeBase64(value);
-        //         const message = nacl.sign.open(signedMessage, verifyKey);
+        for (const encrypted of responseData) {
+            const encryptedData = encrypted.encryptedData;
+            //console.log('encryptedData:', encryptedData);
+            const signedMessage = naclUtil.decodeBase64(encryptedData);
+            const message = nacl.sign.open(signedMessage, verifyKey);
 
-        //         if (!message) {
-        //             throw new Error(`Invalid signature for key: ${key}`);
-        //         }
+            if (!message) {
+                throw new Error(`Invalid signature for key`);
+            }
+            const decryptedData = await this.decryptData(message, secret);
+            //console.log('decryptedData:', decryptedData);
+            const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
+            //console.log('wrappedData:', wrappedData);
 
-        //         const decrypted = await this.decryptData(message, secret);
-        //         return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
-        //     })
-        // );
-
-        // return Object.fromEntries(data);
+            userData = {
+                ...userData,
+                email: wrappedData.email ?? userData.email,
+                firstName: wrappedData.name?.firstName ?? userData.firstName,
+                lastName: wrappedData.name?.lastName ?? userData.lastName,
+                dob: wrappedData.birthDate,
+                phone: wrappedData.phone ?? userData.phone,
+                idNumber: wrappedData.document?.number ?? userData.idNumber,
+                idType: wrappedData.document?.type != null
+                    ? documentTypeToJSON(wrappedData.document.type)
+                    : userData.idType,
+                bankAccountNumber: wrappedData.bankInfo?.accountNumber ?? userData.bankAccountNumber,
+                bankCode: wrappedData.bankInfo?.bankCode ?? userData.bankCode,
+                bankName: wrappedData.bankInfo?.bankName ?? userData.bankName,
+                selfie: wrappedData.selfieImage ?? userData.selfie,
+            };
+        }
+        console.log('userData:', userData);
+        return userData;
     }
 
     async getValidationResult({ key, secretKey, userPK }: GetValidationResultParams) {
