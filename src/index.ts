@@ -1,14 +1,15 @@
-import {createHash} from 'crypto';
-import {base64url} from 'jose';
-import axios, {AxiosInstance} from 'axios';
+import { createHash } from 'crypto';
+import { base64url } from 'jose';
+import axios, { AxiosInstance } from 'axios';
 import nacl from 'tweetnacl';
 import base58 from 'bs58';
 import naclUtil from 'tweetnacl-util';
 import ed2curve from 'ed2curve';
 import * as protobuf from 'protobufjs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
-const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
+const _baseURL = 'https://kyc-backend-beta-402681483920.europe-west1.run.app/';
 
 interface AuthKeyPair {
     getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -54,7 +55,7 @@ class XFlowPartnerClient {
     private _apiClient: AxiosInstance | null;
     private _protoRoot: protobuf.Root | null;
 
-    private constructor({authKeyPair, baseUrl}: XFlowPartnerClientOptions) {
+    private constructor({ authKeyPair, baseUrl }: XFlowPartnerClientOptions) {
         this.authKeyPair = authKeyPair;
         this.baseUrl = baseUrl || _baseURL;
         this._authPublicKey = '';
@@ -96,15 +97,18 @@ class XFlowPartnerClient {
     }
 
     private async init() {
+
         await Promise.all([
             this.generateAuthToken(),
         ]);
 
         if (!this._protoRoot) {
+
+            const __filename = fileURLToPath(import.meta.url)
+            const __dirname = path.dirname(__filename)
             const protoPath = path.resolve(__dirname, '../protos/data.proto');
             this._protoRoot = await protobuf.load(protoPath);
         }
-
         console.log(this._protoRoot);
     }
 
@@ -116,7 +120,7 @@ class XFlowPartnerClient {
 
         this._authPublicKey = base58.encode(publicKeyBytes);
 
-        const header = {alg: 'EdDSA', typ: 'JWT'};
+        const header = { alg: 'EdDSA', typ: 'JWT' };
         const payload = {
             iss: this._authPublicKey,
             iat: Math.floor(Date.now() / 1000),
@@ -136,7 +140,7 @@ class XFlowPartnerClient {
 
         this._apiClient = axios.create({
             baseURL: this.baseUrl,
-            headers: {'Authorization': `Bearer ${this._token}`}
+            headers: { 'Authorization': `Bearer ${this._token}` }
         });
     }
 
@@ -153,33 +157,34 @@ class XFlowPartnerClient {
         return decrypted;
     }
 
-    async getData({userPK, secretKey}: DataAccessParams) {
-        const response = await this._apiClient!.post('/v1/getData', {publicKey: userPK});
-        const responseData = response.data.data as [string, string];
+    async getData({ userPK, secretKey }: DataAccessParams) {
+        const response = await this._apiClient!.post('/v1/getUserData', { userPublicKey: userPK });
+        const responseData = response.data.userData;
+        console.log('response in getData:', responseData);
 
-        const verifyKey = base58.decode(userPK);
-        const secret = base58.decode(secretKey);
+        // const verifyKey = base58.decode(userPK);
+        // const secret = base58.decode(secretKey);
 
-        const data = await Promise.all(
-            Object.entries(responseData).map(async ([key, value]) => {
-                if (!value) return [key, ''];
+        // const data = await Promise.all(
+        //     Object.entries(responseData).map(async ([key, value]) => {
+        //         if (!value) return [key, ''];
 
-                const signedMessage = naclUtil.decodeBase64(value);
-                const message = nacl.sign.open(signedMessage, verifyKey);
+        //         const signedMessage = naclUtil.decodeBase64(value);
+        //         const message = nacl.sign.open(signedMessage, verifyKey);
 
-                if (!message) {
-                    throw new Error(`Invalid signature for key: ${key}`);
-                }
+        //         if (!message) {
+        //             throw new Error(`Invalid signature for key: ${key}`);
+        //         }
 
-                const decrypted = await this.decryptData(message, secret);
-                return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
-            })
-        );
+        //         const decrypted = await this.decryptData(message, secret);
+        //         return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
+        //     })
+        // );
 
-        return Object.fromEntries(data);
+        // return Object.fromEntries(data);
     }
 
-    async getValidationResult({key, secretKey, userPK}: GetValidationResultParams) {
+    async getValidationResult({ key, secretKey, userPK }: GetValidationResultParams) {
         const response = await this._apiClient!.post('/v1/getValidationResult', {
             userPublicKey: userPK,
             validatorPublicKey: this._authPublicKey,
@@ -197,7 +202,7 @@ class XFlowPartnerClient {
         return Buffer.from(decrypted).toString('hex');
     }
 
-    async getOrder({externalId, orderId}: OrderIds) {
+    async getOrder({ externalId, orderId }: OrderIds) {
         const response = await this._apiClient!.post('/v1/getOrder', {
             orderId: orderId,
             externalId: externalId,
@@ -212,7 +217,7 @@ class XFlowPartnerClient {
         return response.data;
     }
 
-    async acceptOnRampOrder({orderId, bankName, bankAccount, externalId}: AcceptOnRampOrderParams) {
+    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams) {
         await this._apiClient!.post('/v1/acceptOrder', {
             orderId: orderId,
             bankName: bankName,
@@ -221,7 +226,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async completeOnRampOrder({orderId, transactionId, externalId}: CompleteOnRampOrderParams) {
+    async completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams) {
         await this._apiClient!.post('/v1/completeOrder', {
             orderId: orderId,
             transactionId: transactionId,
@@ -229,7 +234,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async acceptOffRampOrder({orderId, cryptoWalletAddress, externalId}: AcceptOffRampOrderParams) {
+    async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams) {
         await this._apiClient!.post('/v1/acceptOrder', {
             orderId: orderId,
             cryptoWalletAddress: cryptoWalletAddress,
@@ -237,14 +242,14 @@ class XFlowPartnerClient {
         });
     }
 
-    async completeOffRampOrder({orderId, externalId}: OrderIds) {
+    async completeOffRampOrder({ orderId, externalId }: OrderIds) {
         await this._apiClient!.post('/v1/completeOrder', {
             orderId: orderId,
             externalId: externalId,
         });
     }
 
-    async failOrder({orderId, reason, externalId}: FailOrderParams) {
+    async failOrder({ orderId, reason, externalId }: FailOrderParams) {
         await this._apiClient!.post('/v1/failOrder', {
             orderId: orderId,
             reason: reason,
@@ -252,7 +257,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async rejectOrder({orderId, reason}: RejectOrderParams) {
+    async rejectOrder({ orderId, reason }: RejectOrderParams) {
         await this._apiClient!.post('/v1/rejectOrder', {
             orderId: orderId,
             reason: reason
@@ -299,37 +304,37 @@ class XFlowPartnerClient {
         return createHash('sha256').update(value).digest('hex');
     }
 
-    async getEmail({userPK, secretKey}: DataAccessParams) {
-        const [userData, validationResult] = await Promise.all([
-            this.getData({userPK, secretKey}),
-            this.getValidationResult({key: 'email', secretKey, userPK})
-        ]);
+    async getEmail({ userPK, secretKey }: DataAccessParams) {
+        // const [userData, validationResult] = await Promise.all([
+        //     this.getData({userPK, secretKey}),
+        //     this.getValidationResult({key: 'email', secretKey, userPK})
+        // ]);
 
-        const email = userData.email;
-        const emailHash = await this.hash(email);
-        const verified = emailHash === validationResult;
+        // const email = userData.email;
+        // const emailHash = await this.hash(email);
+        // const verified = emailHash === validationResult;
 
-        return {
-            value: email,
-            verified: verified
-        };
+        // return {
+        //     value: email,
+        //     verified: verified
+        // };
     }
 
-    async getPhone({userPK, secretKey}: DataAccessParams) {
-        const [userData, validationResult] = await Promise.all([
-            this.getData({userPK, secretKey}),
-            this.getValidationResult({key: 'phone', secretKey, userPK})
-        ]);
+    async getPhone({ userPK, secretKey }: DataAccessParams) {
+        // const [userData, validationResult] = await Promise.all([
+        //     this.getData({userPK, secretKey}),
+        //     this.getValidationResult({key: 'phone', secretKey, userPK})
+        // ]);
 
-        const phone = userData.phone;
-        const phoneHash = await this.hash(phone);
-        const verified = phoneHash === validationResult;
+        // const phone = userData.phone;
+        // const phoneHash = await this.hash(phone);
+        // const verified = phoneHash === validationResult;
 
-        return {
-            value: phone,
-            verified: verified
-        };
+        // return {
+        //     value: phone,
+        //     verified: verified
+        // };
     }
 }
 
-export {XFlowPartnerClient};
+export { XFlowPartnerClient };
