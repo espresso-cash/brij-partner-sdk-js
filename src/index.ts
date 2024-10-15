@@ -5,9 +5,6 @@ import nacl from 'tweetnacl';
 import base58 from 'bs58';
 import naclUtil from 'tweetnacl-util';
 import ed2curve from 'ed2curve';
-import * as protobuf from 'protobufjs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { WrappedData, WrappedValidation } from './generated/protos/data';
 
 const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
@@ -73,7 +70,6 @@ class XFlowPartnerClient {
     private _authPublicKey: string;
     private _token: string;
     private _apiClient: AxiosInstance | null;
-    private _protoRoot: protobuf.Root | null;
 
     private constructor({ authKeyPair, baseUrl }: XFlowPartnerClientOptions) {
         this.authKeyPair = authKeyPair;
@@ -81,7 +77,6 @@ class XFlowPartnerClient {
         this._authPublicKey = '';
         this._token = '';
         this._apiClient = null;
-        this._protoRoot = null;
     }
 
     static async generateKeyPair() {
@@ -117,19 +112,9 @@ class XFlowPartnerClient {
     }
 
     private async init() {
-
         await Promise.all([
             this.generateAuthToken(),
         ]);
-
-        if (!this._protoRoot) {
-
-            const __filename = fileURLToPath(import.meta.url)
-            const __dirname = path.dirname(__filename)
-            const protoPath = path.resolve(__dirname, '../protos/data.proto');
-            //this._protoRoot = await protobuf.load(protoPath);
-        }
-        console.log(this._protoRoot);
     }
 
     private async generateAuthToken() {

@@ -78,7 +78,6 @@ declare class XFlowPartnerClient {
     private _authPublicKey;
     private _token;
     private _apiClient;
-    private _protoRoot;
     private constructor();
     static generateKeyPair(): Promise<{
         publicKey: string;
