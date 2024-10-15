@@ -74,7 +74,7 @@ class XFlowPartnerClient {
             headers: { 'Authorization': `Bearer ${this._token}` }
         });
     }
-    async getData({ userPK, secretKey }) {
+    async getUserData({ userPK, secretKey }) {
         const response = await this._apiClient.post('/v1/getUserData', { userPublicKey: userPK });
         const responseData = response.data;
         const validationMap = new Map();
@@ -107,7 +107,7 @@ class XFlowPartnerClient {
                 custom[result.type] = result.value;
             }
         }
-        const profile = {
+        const userData = {
             email: [],
             phone: [],
             name: [],
@@ -136,14 +136,14 @@ class XFlowPartnerClient {
                 verified = hash === verificationData.value;
             }
             if (wrappedData.email) {
-                profile.email.push({
+                userData.email.push({
                     value: wrappedData.email,
                     dataId,
                     verified,
                 });
             }
             else if (wrappedData.name) {
-                profile.name.push({
+                userData.name.push({
                     firstName: wrappedData.name.firstName,
                     lastName: wrappedData.name.lastName,
                     dataId,
@@ -151,21 +151,21 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.birthDate) {
-                profile.birthDate.push({
+                userData.birthDate.push({
                     value: new Date(wrappedData.birthDate),
                     dataId,
                     verified,
                 });
             }
             else if (wrappedData.phone) {
-                profile.phone.push({
+                userData.phone.push({
                     value: wrappedData.phone,
                     dataId,
                     verified,
                 });
             }
             else if (wrappedData.document) {
-                profile.document.push({
+                userData.document.push({
                     type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
                     dataId,
@@ -173,7 +173,7 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.bankInfo) {
-                profile.bankInfo.push({
+                userData.bankInfo.push({
                     bankName: wrappedData.bankInfo.bankName,
                     accountNumber: wrappedData.bankInfo.accountNumber,
                     bankCode: wrappedData.bankInfo.bankCode,
@@ -182,15 +182,14 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.selfieImage) {
-                profile.selfie.push({
+                userData.selfie.push({
                     value: wrappedData.selfieImage,
                     dataId,
                     verified,
                 });
             }
         }
-        console.log(profile);
-        return profile;
+        return userData;
     }
     async getOrder({ externalId, orderId }) {
         const response = await this._apiClient.post('/v1/getOrder', {

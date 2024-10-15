@@ -30,7 +30,7 @@ export type DataAccessParams = {
     userPK: string;
     secretKey: string;
 };
-interface UserProfile {
+interface UserData {
     email: Array<{
         value: string;
         dataId: string;
@@ -90,7 +90,7 @@ declare class XFlowPartnerClient {
     static fromSeed(seed: string): Promise<XFlowPartnerClient>;
     private init;
     private generateAuthToken;
-    getData({ userPK, secretKey }: DataAccessParams): Promise<UserProfile>;
+    getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
     getOrder({ externalId, orderId }: OrderIds): Promise<any>;
     getPartnerOrders(): Promise<any>;
     acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void>;

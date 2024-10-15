@@ -43,7 +43,7 @@ export type RejectOrderParams = { orderId: string, reason: string };
 
 export type DataAccessParams = { userPK: string, secretKey: string };
 
-interface UserProfile {
+interface UserData {
     email: Array<{ value: string; dataId: string; verified: boolean }>;
     phone: Array<{ value: string; dataId: string; verified: boolean }>;
     name: Array<{ firstName: string; lastName: string; dataId: string; verified: boolean }>;
@@ -149,7 +149,7 @@ class XFlowPartnerClient {
         });
     }
 
-    async getData({ userPK, secretKey }: DataAccessParams): Promise<UserProfile> {
+    async getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData> {
         const response = await this._apiClient!.post('/v1/getUserData', { userPublicKey: userPK });
         const responseData = response.data;
 
@@ -188,7 +188,7 @@ class XFlowPartnerClient {
             }
         }
 
-        const profile: UserProfile = {
+        const userData: UserData = {
             email: [],
             phone: [],
             name: [],
@@ -223,39 +223,39 @@ class XFlowPartnerClient {
             }
 
             if (wrappedData.email) {
-                profile.email.push({
+                userData.email.push({
                     value: wrappedData.email,
                     dataId,
                     verified,
                 });
             } else if (wrappedData.name) {
-                profile.name.push({
+                userData.name.push({
                     firstName: wrappedData.name.firstName,
                     lastName: wrappedData.name.lastName,
                     dataId,
                     verified,
                 });
             } else if (wrappedData.birthDate) {
-                profile.birthDate.push({
+                userData.birthDate.push({
                     value: new Date(wrappedData.birthDate),
                     dataId,
                     verified,
                 });
             } else if (wrappedData.phone) {
-                profile.phone.push({
+                userData.phone.push({
                     value: wrappedData.phone,
                     dataId,
                     verified,
                 });
             } else if (wrappedData.document) {
-                profile.document.push({
+                userData.document.push({
                     type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
                     dataId,
                     verified,
                 });
             } else if (wrappedData.bankInfo) {
-                profile.bankInfo.push({
+                userData.bankInfo.push({
                     bankName: wrappedData.bankInfo.bankName,
                     accountNumber: wrappedData.bankInfo.accountNumber,
                     bankCode: wrappedData.bankInfo.bankCode,
@@ -263,7 +263,7 @@ class XFlowPartnerClient {
                     verified,
                 });
             } else if (wrappedData.selfieImage) {
-                profile.selfie.push({
+                userData.selfie.push({
                     value: wrappedData.selfieImage,
                     dataId,
                     verified,
@@ -271,8 +271,7 @@ class XFlowPartnerClient {
             }
         }
 
-        console.log(profile);
-        return profile;
+        return userData;
     }
 
     async getOrder({ externalId, orderId }: OrderIds) {
