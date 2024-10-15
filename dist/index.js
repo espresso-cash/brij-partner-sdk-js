@@ -114,7 +114,7 @@ class XFlowPartnerClient {
             const wrappedData = WrappedValidation.decode(new Uint8Array(decryptedData));
             if (wrappedData.hash) {
                 const result = {
-                    dataId: encryptedData.dataId,
+                    dataId: encrypted.dataId,
                     value: wrappedData.hash,
                 };
                 validationMap.set(result.dataId, result);
@@ -147,7 +147,7 @@ class XFlowPartnerClient {
             }
             const decryptedData = await this.decryptData(message, secret);
             const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
-            const dataId = encryptedData.id;
+            const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
             let verified = false;
             if (verificationData) {
