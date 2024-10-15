@@ -5,7 +5,7 @@ async function main() {
             const seed = '8ui6TQMfAudigNuKycopDyZ6irMeS7DTSe73d2gzv1Hz';
             const xflowClient = await XFlowPartnerClient.fromSeed(seed);
 
-            const userPK = 'G6Zc2W61teXir32BVshg1qjLRrRtSk88HLgFvHFBaMsP';
+            const userPK = 'DtQwFG1W8ZEcUbd8pe7WMJpw4BSEtJhYrYan4Jr9zd2P';
 
             const userSecretKey = await xflowClient.getUserSecretKey(userPK);
             

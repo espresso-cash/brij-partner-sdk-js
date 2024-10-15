@@ -33,18 +33,47 @@ export type DataAccessParams = {
 export type GetValidationResultParams = DataAccessParams & {
     key: string;
 };
-interface UserData {
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    dob?: Date;
-    phone?: string;
-    idNumber?: string;
-    idType?: string;
-    bankAccountNumber?: string;
-    bankCode?: string;
-    bankName?: string;
-    selfie?: Uint8Array;
+interface UserProfile {
+    email: Array<{
+        value: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    phone: Array<{
+        value: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    name: Array<{
+        firstName: string;
+        lastName: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    birthDate: Array<{
+        value: Date;
+        dataId: string;
+        verified: boolean;
+    }>;
+    document: Array<{
+        type: string;
+        number: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    bankInfo: Array<{
+        bankName: string;
+        accountNumber: string;
+        bankCode: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    selfie: Array<{
+        value: Uint8Array;
+        dataId: string;
+        verified: boolean;
+    }>;
+    custom: Record<string, string>;
 }
 declare class XFlowPartnerClient {
     private authKeyPair;
@@ -66,7 +95,7 @@ declare class XFlowPartnerClient {
     private init;
     private generateAuthToken;
     private decryptData;
-    getData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
+    getData({ userPK, secretKey }: DataAccessParams): Promise<UserProfile>;
     getValidationResult({ key, secretKey, userPK }: GetValidationResultParams): Promise<string | null>;
     getOrder({ externalId, orderId }: OrderIds): Promise<any>;
     getPartnerOrders(): Promise<any>;
@@ -78,7 +107,7 @@ declare class XFlowPartnerClient {
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
-    private hash;
+    private generateHash;
     getEmail({ userPK, secretKey }: DataAccessParams): Promise<void>;
     getPhone({ userPK, secretKey }: DataAccessParams): Promise<void>;
 }

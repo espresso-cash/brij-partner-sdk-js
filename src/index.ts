@@ -8,7 +8,7 @@ import ed2curve from 'ed2curve';
 import * as protobuf from 'protobufjs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { WrappedData, documentTypeToJSON } from './generated/protos/data';
+import { WrappedData, WrappedValidation, documentTypeToJSON } from './generated/protos/data';
 
 const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
 
@@ -48,18 +48,26 @@ export type DataAccessParams = { userPK: string, secretKey: string };
 
 export type GetValidationResultParams = DataAccessParams & { key: string };
 
-interface UserData {
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    dob?: Date;
-    phone?: string;
-    idNumber?: string;
-    idType?: string;
-    bankAccountNumber?: string;
-    bankCode?: string;
-    bankName?: string;
-    selfie?: Uint8Array;
+
+interface UserProfile {
+    email: Array<{ value: string; dataId: string; verified: boolean }>;
+    phone: Array<{ value: string; dataId: string; verified: boolean }>;
+    name: Array<{ firstName: string; lastName: string; dataId: string; verified: boolean }>;
+    birthDate: Array<{ value: Date; dataId: string; verified: boolean }>;
+    document: Array<{ type: string; number: string; dataId: string; verified: boolean }>;
+    bankInfo: Array<{ bankName: string; accountNumber: string; bankCode: string; dataId: string; verified: boolean }>;
+    selfie: Array<{ value: Uint8Array; dataId: string; verified: boolean }>;
+    custom: Record<string, string>;
+}
+
+interface ValidationResult {
+    dataId: string;
+    value: string;
+}
+
+interface CustomValidationResult {
+    type: string;
+    value: string;
 }
 
 class XFlowPartnerClient {
@@ -172,48 +180,130 @@ class XFlowPartnerClient {
         return decrypted;
     }
 
-    async getData({ userPK, secretKey }: DataAccessParams): Promise<UserData> {
+    async getData({ userPK, secretKey }: DataAccessParams): Promise<UserProfile> {
         const response = await this._apiClient!.post('/v1/getUserData', { userPublicKey: userPK });
-        const responseData = response.data.userData;
+        const responseData = response.data;
 
-        const verifyKey = base58.decode(userPK);
+        const validationMap = new Map<string, ValidationResult>();
+        const custom: Record<string, string> = {};
+
+        const userVerifyKey = base58.decode(userPK);
         const secret = base58.decode(secretKey);
 
-        let userData: UserData = {};
-
-        for (const encrypted of responseData) {
+        // Validation results
+        for (const encrypted of responseData.validationData) {
             const encryptedData = encrypted.encryptedData;
-            //console.log('encryptedData:', encryptedData);
+            const validatorVerifyKey = base58.decode(encrypted.validatorPublicKey);
+
             const signedMessage = naclUtil.decodeBase64(encryptedData);
-            const message = nacl.sign.open(signedMessage, verifyKey);
+            const message = nacl.sign.open(signedMessage, validatorVerifyKey);
 
             if (!message) {
                 throw new Error(`Invalid signature for key`);
             }
             const decryptedData = await this.decryptData(message, secret);
-            //console.log('decryptedData:', decryptedData);
-            const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
-            //console.log('wrappedData:', wrappedData);
+            const wrappedData = WrappedValidation.decode(new Uint8Array(decryptedData));
 
-            userData = {
-                ...userData,
-                email: wrappedData.email ?? userData.email,
-                firstName: wrappedData.name?.firstName ?? userData.firstName,
-                lastName: wrappedData.name?.lastName ?? userData.lastName,
-                dob: wrappedData.birthDate,
-                phone: wrappedData.phone ?? userData.phone,
-                idNumber: wrappedData.document?.number ?? userData.idNumber,
-                idType: wrappedData.document?.type != null
-                    ? documentTypeToJSON(wrappedData.document.type)
-                    : userData.idType,
-                bankAccountNumber: wrappedData.bankInfo?.accountNumber ?? userData.bankAccountNumber,
-                bankCode: wrappedData.bankInfo?.bankCode ?? userData.bankCode,
-                bankName: wrappedData.bankInfo?.bankName ?? userData.bankName,
-                selfie: wrappedData.selfieImage ?? userData.selfie,
-            };
+            if (wrappedData.hash) {
+                const result: ValidationResult = {
+                    dataId: encryptedData.dataId,
+                    value: wrappedData.hash,
+                };
+                validationMap.set(result.dataId, result);
+            } else if (wrappedData.custom) {
+                const result: CustomValidationResult = {
+                    type: wrappedData.custom.type,
+                    value: new TextDecoder().decode(wrappedData.custom.data),
+                };
+                custom[result.type] = result.value;
+            }
         }
-        console.log('userData:', userData);
-        return userData;
+
+        const profile: UserProfile = {
+            email: [],
+            phone: [],
+            name: [],
+            birthDate: [],
+            document: [],
+            bankInfo: [],
+            selfie: [],
+            custom,
+        };
+
+        // User data
+        for (const encrypted of responseData.userData) {
+            const encryptedData = encrypted.encryptedData;
+            const signedMessage = naclUtil.decodeBase64(encryptedData);
+            const message = nacl.sign.open(signedMessage, userVerifyKey);
+
+            if (!message) {
+                throw new Error(`Invalid signature for key`);
+            }
+            const decryptedData = await this.decryptData(message, secret);
+            const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
+
+            const dataId = encryptedData.id;
+            const verificationData = validationMap.get(dataId);
+
+            let verified = false;
+            if (verificationData) {
+                const item = wrappedData.email ?? '';
+                const hash = await this.generateHash(item);
+                verified = hash === verificationData.value;
+            }
+
+            if (wrappedData.email) {
+                profile.email.push({
+                    value: wrappedData.email,
+                    dataId,
+                    verified,
+                });
+            } else if (wrappedData.name) {
+                profile.name.push({
+                    firstName: wrappedData.name.firstName,
+                    lastName: wrappedData.name.lastName,
+                    dataId,
+                    verified,
+                });
+            } else if (wrappedData.birthDate) {
+                profile.birthDate.push({
+                    value: new Date(wrappedData.birthDate),
+                    dataId,
+                    verified,
+                });
+            } else if (wrappedData.phone) {
+                profile.phone.push({
+                    value: wrappedData.phone,
+                    dataId,
+                    verified,
+                });
+            } else if (wrappedData.document) {
+                profile.document.push({
+                    type: '',
+                    //type: this.idTypeToString(wrappedData.document.type),
+                    number: wrappedData.document.number,
+                    dataId,
+                    verified,
+                });
+            } else if (wrappedData.bankInfo) {
+                profile.bankInfo.push({
+                    bankName: wrappedData.bankInfo.bankName,
+                    accountNumber: wrappedData.bankInfo.accountNumber,
+                    bankCode: wrappedData.bankInfo.bankCode,
+                    dataId,
+                    verified,
+                });
+            } else if (wrappedData.selfieImage) {
+                profile.selfie.push({
+                    value: wrappedData.selfieImage,
+                    dataId,
+                    verified,
+                });
+            }
+        }
+
+        console.log(profile);
+        return profile;
     }
 
     async getValidationResult({ key, secretKey, userPK }: GetValidationResultParams) {
@@ -332,7 +422,7 @@ class XFlowPartnerClient {
         return base58.encode(decryptedSecretKey);
     }
 
-    private async hash(value: string) {
+    private async generateHash(value: string) {
         return createHash('sha256').update(value).digest('hex');
     }
 
