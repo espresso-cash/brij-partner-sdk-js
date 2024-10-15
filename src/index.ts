@@ -8,7 +8,7 @@ import ed2curve from 'ed2curve';
 import * as protobuf from 'protobufjs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { WrappedData, WrappedValidation, documentTypeToJSON } from './generated/protos/data';
+import { WrappedData, WrappedValidation } from './generated/protos/data';
 
 const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
 
@@ -45,9 +45,6 @@ export type AcceptOffRampOrderParams = {
 export type RejectOrderParams = { orderId: string, reason: string };
 
 export type DataAccessParams = { userPK: string, secretKey: string };
-
-export type GetValidationResultParams = DataAccessParams & { key: string };
-
 
 interface UserProfile {
     email: Array<{ value: string; dataId: string; verified: boolean }>;
@@ -167,19 +164,6 @@ class XFlowPartnerClient {
         });
     }
 
-    private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array) {
-        const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
-        const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
-
-        const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
-
-        if (!decrypted) {
-            throw new Error('Unable to decrypt data');
-        }
-
-        return decrypted;
-    }
-
     async getData({ userPK, secretKey }: DataAccessParams): Promise<UserProfile> {
         const response = await this._apiClient!.post('/v1/getUserData', { userPublicKey: userPK });
         const responseData = response.data;
@@ -280,6 +264,7 @@ class XFlowPartnerClient {
                 });
             } else if (wrappedData.document) {
                 profile.document.push({
+                    // Todo
                     type: '',
                     //type: this.idTypeToString(wrappedData.document.type),
                     number: wrappedData.document.number,
@@ -305,24 +290,6 @@ class XFlowPartnerClient {
 
         console.log(profile);
         return profile;
-    }
-
-    async getValidationResult({ key, secretKey, userPK }: GetValidationResultParams) {
-        const response = await this._apiClient!.post('/v1/getValidationResult', {
-            userPublicKey: userPK,
-            validatorPublicKey: this._authPublicKey,
-        });
-        const data = response.data['data'][key];
-
-        if (!data) return null;
-
-        const secret = base58.decode(secretKey);
-
-        const signedMessage = naclUtil.decodeBase64(data);
-        const message = signedMessage.slice(nacl.sign.signatureLength);
-
-        const decrypted = await this.decryptData(message, secret);
-        return Buffer.from(decrypted).toString('hex');
     }
 
     async getOrder({ externalId, orderId }: OrderIds) {
@@ -423,40 +390,21 @@ class XFlowPartnerClient {
         return base58.encode(decryptedSecretKey);
     }
 
+    private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array) {
+        const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
+        const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
+
+        const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
+
+        if (!decrypted) {
+            throw new Error('Unable to decrypt data');
+        }
+
+        return decrypted;
+    }
+
     private async generateHash(value: string) {
         return createHash('sha256').update(value).digest('hex');
-    }
-
-    async getEmail({ userPK, secretKey }: DataAccessParams) {
-        // const [userData, validationResult] = await Promise.all([
-        //     this.getData({userPK, secretKey}),
-        //     this.getValidationResult({key: 'email', secretKey, userPK})
-        // ]);
-
-        // const email = userData.email;
-        // const emailHash = await this.hash(email);
-        // const verified = emailHash === validationResult;
-
-        // return {
-        //     value: email,
-        //     verified: verified
-        // };
-    }
-
-    async getPhone({ userPK, secretKey }: DataAccessParams) {
-        // const [userData, validationResult] = await Promise.all([
-        //     this.getData({userPK, secretKey}),
-        //     this.getValidationResult({key: 'phone', secretKey, userPK})
-        // ]);
-
-        // const phone = userData.phone;
-        // const phoneHash = await this.hash(phone);
-        // const verified = phoneHash === validationResult;
-
-        // return {
-        //     value: phone,
-        //     verified: verified
-        // };
     }
 }
 
