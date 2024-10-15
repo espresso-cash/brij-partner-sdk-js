@@ -5,7 +5,7 @@ import nacl from 'tweetnacl';
 import base58 from 'bs58';
 import naclUtil from 'tweetnacl-util';
 import ed2curve from 'ed2curve';
-import { WrappedData, WrappedValidation } from './generated/protos/data';
+import { WrappedData, WrappedValidation, documentTypeToJSON } from './generated/protos/data';
 const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
 class XFlowPartnerClient {
     authKeyPair;
@@ -166,9 +166,7 @@ class XFlowPartnerClient {
             }
             else if (wrappedData.document) {
                 profile.document.push({
-                    // Todo
-                    type: '',
-                    //type: this.idTypeToString(wrappedData.document.type),
+                    type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
                     dataId,
                     verified,
