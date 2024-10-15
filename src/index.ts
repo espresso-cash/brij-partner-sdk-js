@@ -232,8 +232,8 @@ class XFlowPartnerClient {
 
             let verified = false;
             if (verificationData) {
-                const item = wrappedData.email ?? '';
-                const hash = await this.generateHash(item);
+                const serializedData = naclUtil.encodeBase64(WrappedData.encode(wrappedData).finish());
+                const hash = await this.generateHash(serializedData);
                 verified = hash === verificationData.value;
             }
 
