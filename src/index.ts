@@ -43,7 +43,7 @@ export type RejectOrderParams = { orderId: string, reason: string };
 
 export type DataAccessParams = { userPK: string, secretKey: string };
 
-interface UserData {
+export type UserData = {
     email: Array<{ value: string; dataId: string; verified: boolean }>;
     phone: Array<{ value: string; dataId: string; verified: boolean }>;
     name: Array<{ firstName: string; lastName: string; dataId: string; verified: boolean }>;

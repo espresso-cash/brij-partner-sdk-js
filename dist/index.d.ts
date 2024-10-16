@@ -30,7 +30,7 @@ export type DataAccessParams = {
     userPK: string;
     secretKey: string;
 };
-interface UserData {
+export type UserData = {
     email: Array<{
         value: string;
         dataId: string;
@@ -71,7 +71,7 @@ interface UserData {
         verified: boolean;
     }>;
     custom: Record<string, string>;
-}
+};
 declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;
