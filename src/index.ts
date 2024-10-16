@@ -43,23 +43,27 @@ export type RejectOrderParams = { orderId: string, reason: string };
 
 export type DataAccessParams = { userPK: string, secretKey: string };
 
+export type UserDataField = { dataId: string, verified: boolean };
+
+export type UserDataValueField<T> = { value: T } & UserDataField;
+
 export type UserData = {
-  email: Array<{ value: string; dataId: string; verified: boolean }>;
-  phone: Array<{ value: string; dataId: string; verified: boolean }>;
-  name: Array<{ firstName: string; lastName: string; dataId: string; verified: boolean }>;
-  birthDate: Array<{ value: Date; dataId: string; verified: boolean }>;
-  document: Array<{ type: string; number: string; dataId: string; verified: boolean }>;
-  bankInfo: Array<{ bankName: string; accountNumber: string; bankCode: string; dataId: string; verified: boolean }>;
-  selfie: Array<{ value: Uint8Array; dataId: string; verified: boolean }>;
+  email: Array<UserDataValueField<string>>;
+  phone: Array<UserDataValueField<string>>;
+  name: Array<{ firstName: string; lastName: string } & UserDataField>;
+  birthDate: Array<UserDataValueField<Date>>;
+  document: Array<{ type: string; number: string } & UserDataField>;
+  bankInfo: Array<{ bankName: string; accountNumber: string; bankCode: string } & UserDataField>;
+  selfie: Array<UserDataValueField<Uint8Array>>;
   custom: Record<string, string>;
 }
 
-interface ValidationResult {
+type ValidationResult = {
   dataId: string;
   value: string;
 }
 
-interface CustomValidationResult {
+type CustomValidationResult = {
   type: string;
   value: string;
 }
