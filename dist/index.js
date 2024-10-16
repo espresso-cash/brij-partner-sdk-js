@@ -5,6 +5,7 @@ import nacl from 'tweetnacl';
 import base58 from 'bs58';
 import naclUtil from 'tweetnacl-util';
 import ed2curve from 'ed2curve';
+import { WrappedData, WrappedValidation, documentTypeToJSON } from './generated/protos/data';
 const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
 class XFlowPartnerClient {
     authKeyPair;
@@ -73,46 +74,122 @@ class XFlowPartnerClient {
             headers: { 'Authorization': `Bearer ${this._token}` }
         });
     }
-    async decryptData(encryptedMessage, key) {
-        const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
-        const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
-        const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
-        if (!decrypted) {
-            throw new Error('Unable to decrypt data');
-        }
-        return decrypted;
-    }
-    async getData({ userPK, secretKey }) {
-        const response = await this._apiClient.post('/v1/getData', { publicKey: userPK });
-        const responseData = response.data.data;
-        const verifyKey = base58.decode(userPK);
+    async getUserData({ userPK, secretKey }) {
+        const response = await this._apiClient.post('/v1/getUserData', { userPublicKey: userPK });
+        const responseData = response.data;
+        const validationMap = new Map();
+        const custom = {};
+        const userVerifyKey = base58.decode(userPK);
         const secret = base58.decode(secretKey);
-        const data = await Promise.all(Object.entries(responseData).map(async ([key, value]) => {
-            if (!value)
-                return [key, ''];
-            const signedMessage = naclUtil.decodeBase64(value);
-            const message = nacl.sign.open(signedMessage, verifyKey);
+        // Validation results
+        for (const encrypted of responseData.validationData) {
+            const encryptedData = encrypted.encryptedData;
+            const validatorVerifyKey = base58.decode(encrypted.validatorPublicKey);
+            const signedMessage = naclUtil.decodeBase64(encryptedData);
+            const message = nacl.sign.open(signedMessage, validatorVerifyKey);
             if (!message) {
-                throw new Error(`Invalid signature for key: ${key}`);
+                throw new Error(`Invalid signature for key`);
             }
-            const decrypted = await this.decryptData(message, secret);
-            return [key, ['photoSelfie', 'photoIdCard'].includes(key) ? decrypted : new TextDecoder().decode(decrypted)];
-        }));
-        return Object.fromEntries(data);
-    }
-    async getValidationResult({ key, secretKey, userPK }) {
-        const response = await this._apiClient.post('/v1/getValidationResult', {
-            userPublicKey: userPK,
-            validatorPublicKey: this._authPublicKey,
-        });
-        const data = response.data['data'][key];
-        if (!data)
-            return null;
-        const secret = base58.decode(secretKey);
-        const signedMessage = naclUtil.decodeBase64(data);
-        const message = signedMessage.slice(nacl.sign.signatureLength);
-        const decrypted = await this.decryptData(message, secret);
-        return Buffer.from(decrypted).toString('hex');
+            const decryptedData = await this.decryptData(message, secret);
+            const wrappedData = WrappedValidation.decode(new Uint8Array(decryptedData));
+            if (wrappedData.hash) {
+                const result = {
+                    dataId: encrypted.dataId,
+                    value: wrappedData.hash,
+                };
+                validationMap.set(result.dataId, result);
+            }
+            else if (wrappedData.custom) {
+                const result = {
+                    type: wrappedData.custom.type,
+                    value: new TextDecoder().decode(wrappedData.custom.data),
+                };
+                custom[result.type] = result.value;
+            }
+        }
+        const userData = {
+            email: [],
+            phone: [],
+            name: [],
+            birthDate: [],
+            document: [],
+            bankInfo: [],
+            selfie: [],
+            custom,
+        };
+        // User data
+        for (const encrypted of responseData.userData) {
+            const encryptedData = encrypted.encryptedData;
+            const signedMessage = naclUtil.decodeBase64(encryptedData);
+            const message = nacl.sign.open(signedMessage, userVerifyKey);
+            if (!message) {
+                throw new Error(`Invalid signature for key`);
+            }
+            const decryptedData = await this.decryptData(message, secret);
+            const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
+            const dataId = encrypted.id;
+            const verificationData = validationMap.get(dataId);
+            let verified = false;
+            if (verificationData) {
+                const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
+                const hash = await this.generateHash(serializedData);
+                verified = hash === verificationData.value;
+            }
+            if (wrappedData.email) {
+                userData.email.push({
+                    value: wrappedData.email,
+                    dataId,
+                    verified,
+                });
+            }
+            else if (wrappedData.name) {
+                userData.name.push({
+                    firstName: wrappedData.name.firstName,
+                    lastName: wrappedData.name.lastName,
+                    dataId,
+                    verified,
+                });
+            }
+            else if (wrappedData.birthDate) {
+                userData.birthDate.push({
+                    value: new Date(wrappedData.birthDate),
+                    dataId,
+                    verified,
+                });
+            }
+            else if (wrappedData.phone) {
+                userData.phone.push({
+                    value: wrappedData.phone,
+                    dataId,
+                    verified,
+                });
+            }
+            else if (wrappedData.document) {
+                userData.document.push({
+                    type: documentTypeToJSON(wrappedData.document.type),
+                    number: wrappedData.document.number,
+                    dataId,
+                    verified,
+                });
+            }
+            else if (wrappedData.bankInfo) {
+                userData.bankInfo.push({
+                    bankName: wrappedData.bankInfo.bankName,
+                    accountNumber: wrappedData.bankInfo.accountNumber,
+                    bankCode: wrappedData.bankInfo.bankCode,
+                    dataId,
+                    verified,
+                });
+            }
+            else if (wrappedData.selfieImage) {
+                userData.selfie.push({
+                    value: wrappedData.selfieImage,
+                    dataId,
+                    verified,
+                });
+            }
+        }
+        return userData;
     }
     async getOrder({ externalId, orderId }) {
         const response = await this._apiClient.post('/v1/getOrder', {
@@ -187,34 +264,17 @@ class XFlowPartnerClient {
         }
         return base58.encode(decryptedSecretKey);
     }
-    async hash(value) {
+    async decryptData(encryptedMessage, key) {
+        const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
+        const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
+        const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
+        if (!decrypted) {
+            throw new Error('Unable to decrypt data');
+        }
+        return decrypted;
+    }
+    async generateHash(value) {
         return createHash('sha256').update(value).digest('hex');
-    }
-    async getEmail({ userPK, secretKey }) {
-        const [userData, validationResult] = await Promise.all([
-            this.getData({ userPK, secretKey }),
-            this.getValidationResult({ key: 'email', secretKey, userPK })
-        ]);
-        const email = userData.email;
-        const emailHash = await this.hash(email);
-        const verified = emailHash === validationResult;
-        return {
-            value: email,
-            verified: verified
-        };
-    }
-    async getPhone({ userPK, secretKey }) {
-        const [userData, validationResult] = await Promise.all([
-            this.getData({ userPK, secretKey }),
-            this.getValidationResult({ key: 'phone', secretKey, userPK })
-        ]);
-        const phone = userData.phone;
-        const phoneHash = await this.hash(phone);
-        const verified = phoneHash === validationResult;
-        return {
-            value: phone,
-            verified: verified
-        };
     }
 }
 export { XFlowPartnerClient };

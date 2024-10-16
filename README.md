@@ -61,7 +61,7 @@ An order has the following structure:
 }
 ```
 
-### Getting User Data
+### Getting User Data and Verification Info
 
 To access user data, first obtain the user’s secret key:
 
@@ -76,53 +76,93 @@ console.log('userSecretKey:', secretKey);
 Using this key, you can access the user’s raw information:
 
 ```Javascript
-const data = await client.getData({
+const data = await client.getUserData({
     userPK: order.userPublicKey,
     secretKey: secretKey,
 });
 console.log(data);
 ```
 
-You will receive the following structure:
+You will receive the following structure, where you can see data and verification info:
 
 ```json
 {
-  "email": "test@example.com",
-  "phone": "+1234567890",
-  "firstName": "",
-  "middleName": "",
-  "lastName": "",
-  "dob": "",
-  "countryCode": "",
-  "idType": "",
-  "idNumber": "",
-  "photoIdCard": "",
-  "photoSelfie": "",
-  "bankAccountNumber": "",
-  "bankCode": ""
+  "email": [
+    {
+      "value": "test@gmail.com",
+      "dataId": "2bf9ad39-b213-4b77-b077-872e93301814",
+      "verified": true
+    }
+  ],
+  "phone": [
+    {
+      "value": "+12345678",
+      "dataId": "6d01814f-431d-4ca6-a4c3-c76ef7fc7343",
+      "verified": false
+    }
+  ],
+  "name": [
+    {
+      "firstName": "John",
+      "lastName": "Doe",
+      "dataId": "2a1b66b2-7bef-4b04-8f13-e7baed9e06eb",
+      "verified": false
+    }
+  ],
+  "birthDate": [
+    {
+      "value": "2000-03-29T21:00:00.000Z",
+      "dataId": "372b9e44-300c-443a-882b-af8cd7ff53d9",
+      "verified": false
+    }
+  ],
+  "document": [
+    {
+      "type": "DOCUMENT_TYPE_VOTER_ID",
+      "number": "1233123",
+      "dataId": "3943bec8-b88d-450d-816b-3faab743ff24",
+      "verified": false
+    }
+  ],
+  "bankInfo": [
+    {
+      "bankName": "bankName",
+      "accountNumber": "accountNumber",
+      "bankCode": "bankCode",
+      "dataId": "54727f50-378d-4d14-bada-5f488b751361",
+      "verified": false
+    }
+  ],
+  "selfie": [
+    {
+     "value": {
+      "1": 60,
+      "2": 115,
+      "3": 118,
+      "4": 103,
+      "5": 32,
+      "6": 119,
+      "7": 105,
+      "8": 100,
+      "9": 116,
+      "10": 104,
+      "11": 61,
+      "12": 34,
+      //...
+        },
+      "dataId": "372b9e44-300c-443a-882b-a3234142429",
+      "verified": false
+    }
+  ],
+  "custom": {
+    "kyc": "\"result\""
+  }
 }
 ```
-
-### Getting Verification Info
-
-You can check if the phone number and email have been verified using the following methods:
-
-```Javascript
-const email = await client.getEmail({
-    userPK: order.userPublicKey,
-    secretKey: secretKey,
-});
-console.log(email); // { value: 'test@example.com', verified: true }
-
-const phone = await client.getPhone({
-    userPK: order.userPublicKey,
-    secretKey: secretKey,
-});
-console.log(phone); // { value: '+1234567890', verified: false }
-```
-
 > [!NOTE]
-> Validation info from SmileID will be available soon.
+> - The `verified` flag indicates whether the information has been verified.
+> - Its possible to have empty arrays meaning no data is available.
+> - The `custom` field contains verification results from external sources like SmileID and etc.
 
 ### Accepting and Completing the On-Ramp Order
 

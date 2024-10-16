@@ -30,8 +30,47 @@ export type DataAccessParams = {
     userPK: string;
     secretKey: string;
 };
-export type GetValidationResultParams = DataAccessParams & {
-    key: string;
+export type UserData = {
+    email: Array<{
+        value: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    phone: Array<{
+        value: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    name: Array<{
+        firstName: string;
+        lastName: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    birthDate: Array<{
+        value: Date;
+        dataId: string;
+        verified: boolean;
+    }>;
+    document: Array<{
+        type: string;
+        number: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    bankInfo: Array<{
+        bankName: string;
+        accountNumber: string;
+        bankCode: string;
+        dataId: string;
+        verified: boolean;
+    }>;
+    selfie: Array<{
+        value: Uint8Array;
+        dataId: string;
+        verified: boolean;
+    }>;
+    custom: Record<string, string>;
 };
 declare class XFlowPartnerClient {
     private authKeyPair;
@@ -51,9 +90,7 @@ declare class XFlowPartnerClient {
     static fromSeed(seed: string): Promise<XFlowPartnerClient>;
     private init;
     private generateAuthToken;
-    private decryptData;
-    getData({ userPK, secretKey }: DataAccessParams): Promise<any>;
-    getValidationResult({ key, secretKey, userPK }: GetValidationResultParams): Promise<string | null>;
+    getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
     getOrder({ externalId, orderId }: OrderIds): Promise<any>;
     getPartnerOrders(): Promise<any>;
     acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void>;
@@ -64,14 +101,7 @@ declare class XFlowPartnerClient {
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
-    private hash;
-    getEmail({ userPK, secretKey }: DataAccessParams): Promise<{
-        value: any;
-        verified: boolean;
-    }>;
-    getPhone({ userPK, secretKey }: DataAccessParams): Promise<{
-        value: any;
-        verified: boolean;
-    }>;
+    private decryptData;
+    private generateHash;
 }
 export { XFlowPartnerClient };
