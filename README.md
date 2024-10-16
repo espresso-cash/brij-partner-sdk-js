@@ -133,7 +133,9 @@ You will receive the following structure, where you can see data and verificatio
 }
 ```
 > [!NOTE]
-> Custom field will contain the verification result from other sources, e.g. SmileID.
+> - The `verified` flag indicates whether the information has been verified.
+> - Empty arrays (e.g., `document`, `selfie`) indicate that no data is available for those fields.
+> - The `custom` field contains verification results from external sources like SmileID and etc.
 
 ### Accepting and Completing the On-Ramp Order
 
