@@ -1,12 +1,12 @@
-import { createHash } from 'crypto';
-import { base64url } from 'jose';
-import axios from 'axios';
-import nacl from 'tweetnacl';
-import base58 from 'bs58';
-import naclUtil from 'tweetnacl-util';
-import ed2curve from 'ed2curve';
-import { WrappedData, WrappedValidation, documentTypeToJSON } from './generated/protos/data';
-const _baseURL = 'https://kyc-backend-oxvpvdtvzq-ew.a.run.app';
+import { createHash } from "crypto";
+import { base64url } from "jose";
+import axios from "axios";
+import nacl from "tweetnacl";
+import base58 from "bs58";
+import naclUtil from "tweetnacl-util";
+import ed2curve from "ed2curve";
+import { documentTypeToJSON, ValidationStatus, WrappedData, WrappedValidation } from "./generated/protos/data";
+const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
 class XFlowPartnerClient {
     authKeyPair;
     baseUrl;
@@ -16,8 +16,8 @@ class XFlowPartnerClient {
     constructor({ authKeyPair, baseUrl }) {
         this.authKeyPair = authKeyPair;
         this.baseUrl = baseUrl || _baseURL;
-        this._authPublicKey = '';
-        this._token = '';
+        this._authPublicKey = "";
+        this._token = "";
         this._apiClient = null;
     }
     static async generateKeyPair() {
@@ -28,7 +28,7 @@ class XFlowPartnerClient {
             secretKey: base58.encode(keyPair.secretKey),
             seed: base58.encode(keyPair.secretKey.slice(0, 32)),
             getPublicKeyBytes: async () => keyPair.publicKey,
-            getPrivateKeyBytes: async () => keyPair.secretKey
+            getPrivateKeyBytes: async () => keyPair.secretKey,
         };
     }
     static async fromSeed(seed) {
@@ -41,7 +41,7 @@ class XFlowPartnerClient {
                 },
                 async getPublicKeyBytes() {
                     return authKeyPair.publicKey;
-                }
+                },
             },
         });
         await client.init();
@@ -55,14 +55,14 @@ class XFlowPartnerClient {
     async generateAuthToken() {
         const [publicKeyBytes, privateKeyBytes] = await Promise.all([
             this.authKeyPair.getPublicKeyBytes(),
-            this.authKeyPair.getPrivateKeyBytes()
+            this.authKeyPair.getPrivateKeyBytes(),
         ]);
         this._authPublicKey = base58.encode(publicKeyBytes);
-        const header = { alg: 'EdDSA', typ: 'JWT' };
+        const header = { alg: "EdDSA", typ: "JWT" };
         const payload = {
             iss: this._authPublicKey,
             iat: Math.floor(Date.now() / 1000),
-            'aud': 'kyc.espressocash.com'
+            "aud": "kyc.espressocash.com",
         };
         const encodedHeader = base64url.encode(JSON.stringify(header));
         const encodedPayload = base64url.encode(JSON.stringify(payload));
@@ -71,11 +71,11 @@ class XFlowPartnerClient {
         this._token = `${dataToSign}.${base64url.encode(signature)}`;
         this._apiClient = axios.create({
             baseURL: this.baseUrl,
-            headers: { 'Authorization': `Bearer ${this._token}` }
+            headers: { "Authorization": `Bearer ${this._token}` },
         });
     }
     async getUserData({ userPK, secretKey }) {
-        const response = await this._apiClient.post('/v1/getUserData', { userPublicKey: userPK });
+        const response = await this._apiClient.post("/v1/getUserData", { userPublicKey: userPK });
         const responseData = response.data;
         const validationMap = new Map();
         const custom = {};
@@ -95,7 +95,8 @@ class XFlowPartnerClient {
             if (wrappedData.hash) {
                 const result = {
                     dataId: encrypted.dataId,
-                    value: wrappedData.hash,
+                    value: wrappedData.hash.hash,
+                    status: wrappedData.hash.status,
                 };
                 validationMap.set(result.dataId, result);
             }
@@ -133,7 +134,7 @@ class XFlowPartnerClient {
             if (verificationData) {
                 const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
                 const hash = await this.generateHash(serializedData);
-                verified = hash === verificationData.value;
+                verified = hash === verificationData.value && verificationData.status === ValidationStatus.VALIDATION_STATUS_APPROVED;
             }
             if (wrappedData.email) {
                 userData.email.push({
@@ -168,6 +169,7 @@ class XFlowPartnerClient {
                 userData.document.push({
                     type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
+                    countryCode: wrappedData.document.countryCode,
                     dataId,
                     verified,
                 });
@@ -192,18 +194,18 @@ class XFlowPartnerClient {
         return userData;
     }
     async getOrder({ externalId, orderId }) {
-        const response = await this._apiClient.post('/v1/getOrder', {
+        const response = await this._apiClient.post("/v1/getOrder", {
             orderId: orderId,
             externalId: externalId,
         });
         return response.data;
     }
     async getPartnerOrders() {
-        const response = await this._apiClient.post('/v1/getPartnerOrders');
+        const response = await this._apiClient.post("/v1/getPartnerOrders");
         return response.data;
     }
     async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }) {
-        await this._apiClient.post('/v1/acceptOrder', {
+        await this._apiClient.post("/v1/acceptOrder", {
             orderId: orderId,
             bankName: bankName,
             bankAccount: bankAccount,
@@ -211,41 +213,41 @@ class XFlowPartnerClient {
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
-        await this._apiClient.post('/v1/completeOrder', {
+        await this._apiClient.post("/v1/completeOrder", {
             orderId: orderId,
             transactionId: transactionId,
             externalId: externalId,
         });
     }
     async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
-        await this._apiClient.post('/v1/acceptOrder', {
+        await this._apiClient.post("/v1/acceptOrder", {
             orderId: orderId,
             cryptoWalletAddress: cryptoWalletAddress,
             externalId: externalId,
         });
     }
     async completeOffRampOrder({ orderId, externalId }) {
-        await this._apiClient.post('/v1/completeOrder', {
+        await this._apiClient.post("/v1/completeOrder", {
             orderId: orderId,
             externalId: externalId,
         });
     }
     async failOrder({ orderId, reason, externalId }) {
-        await this._apiClient.post('/v1/failOrder', {
+        await this._apiClient.post("/v1/failOrder", {
             orderId: orderId,
             reason: reason,
             externalId: externalId,
         });
     }
     async rejectOrder({ orderId, reason }) {
-        await this._apiClient.post('/v1/rejectOrder', {
+        await this._apiClient.post("/v1/rejectOrder", {
             orderId: orderId,
-            reason: reason
+            reason: reason,
         });
     }
     async getUserInfo(publicKey) {
-        const response = await this._apiClient.post('/v1/getInfo', {
-            publicKey: publicKey
+        const response = await this._apiClient.post("/v1/getInfo", {
+            publicKey: publicKey,
         });
         return response.data;
     }
@@ -260,7 +262,7 @@ class XFlowPartnerClient {
         const ciphertext = encryptedData.slice(nacl.box.nonceLength);
         const decryptedSecretKey = nacl.box.open(ciphertext, nonce, x25519PublicKey, x25519PrivateKey);
         if (!decryptedSecretKey) {
-            throw new Error('Decryption failed');
+            throw new Error("Decryption failed");
         }
         return base58.encode(decryptedSecretKey);
     }
@@ -269,12 +271,12 @@ class XFlowPartnerClient {
         const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
         const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
         if (!decrypted) {
-            throw new Error('Unable to decrypt data');
+            throw new Error("Unable to decrypt data");
         }
         return decrypted;
     }
     async generateHash(value) {
-        return createHash('sha256').update(value).digest('hex');
+        return createHash("sha256").update(value).digest("hex");
     }
 }
 export { XFlowPartnerClient };

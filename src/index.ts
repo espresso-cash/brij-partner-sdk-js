@@ -5,7 +5,7 @@ import nacl from "tweetnacl";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import { documentTypeToJSON, WrappedData, WrappedValidation } from "./generated/protos/data";
+import { documentTypeToJSON, ValidationStatus, WrappedData, WrappedValidation } from "./generated/protos/data";
 
 const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
 
@@ -52,7 +52,7 @@ export type UserData = {
   phone: Array<UserDataValueField<string>>;
   name: Array<{ firstName: string; lastName: string } & UserDataField>;
   birthDate: Array<UserDataValueField<Date>>;
-  document: Array<{ type: string; number: string } & UserDataField>;
+  document: Array<{ type: string; number: string; countryCode: string } & UserDataField>;
   bankInfo: Array<{ bankName: string; accountNumber: string; bankCode: string } & UserDataField>;
   selfie: Array<UserDataValueField<Uint8Array>>;
   custom: Record<string, string>;
@@ -61,6 +61,7 @@ export type UserData = {
 type ValidationResult = {
   dataId: string;
   value: string;
+  status: ValidationStatus;
 }
 
 type CustomValidationResult = {
@@ -180,7 +181,8 @@ class XFlowPartnerClient {
       if (wrappedData.hash) {
         const result: ValidationResult = {
           dataId: encrypted.dataId,
-          value: wrappedData.hash,
+          value: wrappedData.hash.hash,
+          status: wrappedData.hash.status,
         };
         validationMap.set(result.dataId, result);
       } else if (wrappedData.custom) {
@@ -223,7 +225,7 @@ class XFlowPartnerClient {
       if (verificationData) {
         const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
         const hash = await this.generateHash(serializedData);
-        verified = hash === verificationData.value;
+        verified = hash === verificationData.value && verificationData.status === ValidationStatus.VALIDATION_STATUS_APPROVED;
       }
 
       if (wrappedData.email) {
@@ -255,6 +257,7 @@ class XFlowPartnerClient {
         userData.document.push({
           type: documentTypeToJSON(wrappedData.document.type),
           number: wrappedData.document.number,
+          countryCode: wrappedData.document.countryCode,
           dataId,
           verified,
         });
