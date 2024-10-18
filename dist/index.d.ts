@@ -32,7 +32,7 @@ export type DataAccessParams = {
 };
 export type UserDataField = {
     dataId: string;
-    verified: boolean;
+    status: ValidationStatus;
 };
 export type UserDataValueField<T> = {
     value: T;
@@ -58,6 +58,13 @@ export type UserData = {
     selfie: Array<UserDataValueField<Uint8Array>>;
     custom: Record<string, string>;
 };
+export declare enum ValidationStatus {
+    Unspecified = "UNSPECIFIED",
+    Pending = "PENDING",
+    Approved = "APPROVED",
+    Rejected = "REJECTED",
+    Unverified = "UNVERIFIED"
+}
 declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;

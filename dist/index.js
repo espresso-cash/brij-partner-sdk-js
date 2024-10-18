@@ -5,8 +5,31 @@ import nacl from "tweetnacl";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import { documentTypeToJSON, ValidationStatus, WrappedData, WrappedValidation } from "./generated/protos/data";
+import { documentTypeToJSON, ValidationStatus as ProtoValidationStatus, WrappedData, WrappedValidation } from "./generated/protos/data";
 const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
+export var ValidationStatus;
+(function (ValidationStatus) {
+    ValidationStatus["Unspecified"] = "UNSPECIFIED";
+    ValidationStatus["Pending"] = "PENDING";
+    ValidationStatus["Approved"] = "APPROVED";
+    ValidationStatus["Rejected"] = "REJECTED";
+    ValidationStatus["Unverified"] = "UNVERIFIED";
+})(ValidationStatus || (ValidationStatus = {}));
+// Add this conversion function
+function toValidationStatus(protoStatus) {
+    switch (protoStatus) {
+        case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
+            return ValidationStatus.Unspecified;
+        case ProtoValidationStatus.VALIDATION_STATUS_PENDING:
+            return ValidationStatus.Pending;
+        case ProtoValidationStatus.VALIDATION_STATUS_APPROVED:
+            return ValidationStatus.Approved;
+        case ProtoValidationStatus.VALIDATION_STATUS_REJECTED:
+            return ValidationStatus.Rejected;
+        default:
+            return ValidationStatus.Unspecified;
+    }
+}
 class XFlowPartnerClient {
     authKeyPair;
     baseUrl;
@@ -130,17 +153,20 @@ class XFlowPartnerClient {
             const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
-            let verified = false;
+            let status = ValidationStatus.Unspecified;
             if (verificationData) {
                 const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
                 const hash = await this.generateHash(serializedData);
-                verified = hash === verificationData.value && verificationData.status === ValidationStatus.VALIDATION_STATUS_APPROVED;
+                const hashMatching = hash === verificationData.value;
+                status = hashMatching
+                    ? toValidationStatus(verificationData.status)
+                    : ValidationStatus.Unverified;
             }
             if (wrappedData.email) {
                 userData.email.push({
                     value: wrappedData.email,
                     dataId,
-                    verified,
+                    status,
                 });
             }
             else if (wrappedData.name) {
@@ -148,21 +174,21 @@ class XFlowPartnerClient {
                     firstName: wrappedData.name.firstName,
                     lastName: wrappedData.name.lastName,
                     dataId,
-                    verified,
+                    status,
                 });
             }
             else if (wrappedData.birthDate) {
                 userData.birthDate.push({
                     value: new Date(wrappedData.birthDate),
                     dataId,
-                    verified,
+                    status,
                 });
             }
             else if (wrappedData.phone) {
                 userData.phone.push({
                     value: wrappedData.phone,
                     dataId,
-                    verified,
+                    status,
                 });
             }
             else if (wrappedData.document) {
@@ -171,7 +197,7 @@ class XFlowPartnerClient {
                     number: wrappedData.document.number,
                     countryCode: wrappedData.document.countryCode,
                     dataId,
-                    verified,
+                    status,
                 });
             }
             else if (wrappedData.bankInfo) {
@@ -180,14 +206,14 @@ class XFlowPartnerClient {
                     accountNumber: wrappedData.bankInfo.accountNumber,
                     bankCode: wrappedData.bankInfo.bankCode,
                     dataId,
-                    verified,
+                    status,
                 });
             }
             else if (wrappedData.selfieImage) {
                 userData.selfie.push({
                     value: wrappedData.selfieImage,
                     dataId,
-                    verified,
+                    status,
                 });
             }
         }
