@@ -38,25 +38,25 @@ export type UserDataValueField<T> = {
     value: T;
 } & UserDataField;
 export type UserData = {
-    email: Array<UserDataValueField<string>>;
-    phone: Array<UserDataValueField<string>>;
+    email: Array<UserDataValueField<string>> | null;
+    phone: Array<UserDataValueField<string>> | null;
     name: Array<{
         firstName: string;
         lastName: string;
-    } & UserDataField>;
-    birthDate: Array<UserDataValueField<Date>>;
+    } & UserDataField> | null;
+    birthDate: Array<UserDataValueField<Date>> | null;
     document: Array<{
         type: string;
         number: string;
         countryCode: string;
-    } & UserDataField>;
+    } & UserDataField> | null;
     bankInfo: Array<{
         bankName: string;
         accountNumber: string;
         bankCode: string;
-    } & UserDataField>;
-    selfie: Array<UserDataValueField<Uint8Array>>;
-    custom: Record<string, string>;
+    } & UserDataField> | null;
+    selfie: Array<UserDataValueField<Uint8Array>> | null;
+    custom: Record<string, string> | null;
 };
 export declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",

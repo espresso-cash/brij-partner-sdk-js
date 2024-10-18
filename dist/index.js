@@ -132,14 +132,14 @@ class XFlowPartnerClient {
             }
         }
         const userData = {
-            email: [],
-            phone: [],
-            name: [],
-            birthDate: [],
-            document: [],
-            bankInfo: [],
-            selfie: [],
-            custom,
+            email: null,
+            phone: null,
+            name: null,
+            birthDate: null,
+            document: null,
+            bankInfo: null,
+            selfie: null,
+            custom: Object.keys(custom).length > 0 ? custom : null,
         };
         // User data
         for (const encrypted of responseData.userData) {
@@ -163,6 +163,8 @@ class XFlowPartnerClient {
                     : ValidationStatus.Unverified;
             }
             if (wrappedData.email) {
+                if (!userData.email)
+                    userData.email = [];
                 userData.email.push({
                     value: wrappedData.email,
                     dataId,
@@ -170,6 +172,8 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.name) {
+                if (!userData.name)
+                    userData.name = [];
                 userData.name.push({
                     firstName: wrappedData.name.firstName,
                     lastName: wrappedData.name.lastName,
@@ -178,6 +182,8 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.birthDate) {
+                if (!userData.birthDate)
+                    userData.birthDate = [];
                 userData.birthDate.push({
                     value: new Date(wrappedData.birthDate),
                     dataId,
@@ -185,6 +191,8 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.phone) {
+                if (!userData.phone)
+                    userData.phone = [];
                 userData.phone.push({
                     value: wrappedData.phone,
                     dataId,
@@ -192,6 +200,8 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.document) {
+                if (!userData.document)
+                    userData.document = [];
                 userData.document.push({
                     type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
@@ -201,6 +211,8 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.bankInfo) {
+                if (!userData.bankInfo)
+                    userData.bankInfo = [];
                 userData.bankInfo.push({
                     bankName: wrappedData.bankInfo.bankName,
                     accountNumber: wrappedData.bankInfo.accountNumber,
@@ -210,6 +222,8 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.selfieImage) {
+                if (!userData.selfie)
+                    userData.selfie = [];
                 userData.selfie.push({
                     value: wrappedData.selfieImage,
                     dataId,
