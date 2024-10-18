@@ -91,14 +91,14 @@ You will receive the following structure, where you can see data and verificatio
     {
       "value": "test@gmail.com",
       "dataId": "2bf9ad39-b213-4b77-b077-872e93301814",
-      "verified": true
+      "status": "APPROVED"
     }
   ],
   "phone": [
     {
       "value": "+12345678",
       "dataId": "6d01814f-431d-4ca6-a4c3-c76ef7fc7343",
-      "verified": false
+      "status": "UNSPECIFIED"
     }
   ],
   "name": [
@@ -106,22 +106,23 @@ You will receive the following structure, where you can see data and verificatio
       "firstName": "John",
       "lastName": "Doe",
       "dataId": "2a1b66b2-7bef-4b04-8f13-e7baed9e06eb",
-      "verified": false
+      "status": "UNSPECIFIED"
     }
   ],
   "birthDate": [
     {
       "value": "2000-03-29T21:00:00.000Z",
       "dataId": "372b9e44-300c-443a-882b-af8cd7ff53d9",
-      "verified": false
+      "status": "UNSPECIFIED"
     }
   ],
   "document": [
     {
       "type": "DOCUMENT_TYPE_VOTER_ID",
       "number": "1233123",
+      "countryCode": "NG",
       "dataId": "3943bec8-b88d-450d-816b-3faab743ff24",
-      "verified": false
+      "status": "UNSPECIFIED"
     }
   ],
   "bankInfo": [
@@ -130,28 +131,22 @@ You will receive the following structure, where you can see data and verificatio
       "accountNumber": "accountNumber",
       "bankCode": "bankCode",
       "dataId": "54727f50-378d-4d14-bada-5f488b751361",
-      "verified": false
+      "status": "UNSPECIFIED"
     }
   ],
   "selfie": [
     {
-     "value": {
-      "1": 60,
-      "2": 115,
-      "3": 118,
-      "4": 103,
-      "5": 32,
-      "6": 119,
-      "7": 105,
-      "8": 100,
-      "9": 116,
-      "10": 104,
-      "11": 61,
-      "12": 34,
-      //...
-        },
+      "value": {
+        "1": 60,
+        "2": 115,
+        "3": 118,
+        "4": 103,
+        "5": 32,
+        "6": 119
+        //...
+      },
       "dataId": "372b9e44-300c-443a-882b-a3234142429",
-      "verified": false
+      "status": "UNSPECIFIED"
     }
   ],
   "custom": {
@@ -159,10 +154,17 @@ You will receive the following structure, where you can see data and verificatio
   }
 }
 ```
+
 > [!NOTE]
-> - The `verified` flag indicates whether the information has been verified.
-> - Its possible to have empty arrays meaning no data is available.
-> - The `custom` field contains verification results from external sources like SmileID and etc.
+>
+> - The `status` field indicates the verification status of each piece of information. Possible statuses are:
+>   - `UNSPECIFIED`: The default state, not yet processed.
+>   - `PENDING`: Verification is in progress.
+>   - `APPROVED`: The information has been verified and approved.
+>   - `REJECTED`: The information was checked but not approved.
+>   - `UNVERIFIED`: The information has not been verified.
+> - It's possible to have `null` value meaning no data is available.
+> - The `custom` field contains verification results from external sources like SmileID or other KYC providers.
 
 ### Accepting and Completing the On-Ramp Order
 

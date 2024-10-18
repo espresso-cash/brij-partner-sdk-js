@@ -1,8 +1,8 @@
 export type OrderIds = {
     orderId: string;
-    externalId?: '';
+    externalId?: "";
 } | {
-    orderId?: '';
+    orderId?: "";
     externalId: string;
 };
 export type CompleteOnRampOrderParams = OrderIds & {
@@ -30,48 +30,41 @@ export type DataAccessParams = {
     userPK: string;
     secretKey: string;
 };
+export type UserDataField = {
+    dataId: string;
+    status: ValidationStatus;
+};
+export type UserDataValueField<T> = {
+    value: T;
+} & UserDataField;
 export type UserData = {
-    email: Array<{
-        value: string;
-        dataId: string;
-        verified: boolean;
-    }>;
-    phone: Array<{
-        value: string;
-        dataId: string;
-        verified: boolean;
-    }>;
+    email: Array<UserDataValueField<string>>;
+    phone: Array<UserDataValueField<string>>;
     name: Array<{
         firstName: string;
         lastName: string;
-        dataId: string;
-        verified: boolean;
-    }>;
-    birthDate: Array<{
-        value: Date;
-        dataId: string;
-        verified: boolean;
-    }>;
+    } & UserDataField>;
+    birthDate: Array<UserDataValueField<Date>>;
     document: Array<{
         type: string;
         number: string;
-        dataId: string;
-        verified: boolean;
-    }>;
+        countryCode: string;
+    } & UserDataField>;
     bankInfo: Array<{
         bankName: string;
         accountNumber: string;
         bankCode: string;
-        dataId: string;
-        verified: boolean;
-    }>;
-    selfie: Array<{
-        value: Uint8Array;
-        dataId: string;
-        verified: boolean;
-    }>;
+    } & UserDataField>;
+    selfie: Array<UserDataValueField<Uint8Array>>;
     custom: Record<string, string>;
 };
+export declare enum ValidationStatus {
+    Unspecified = "UNSPECIFIED",
+    Pending = "PENDING",
+    Approved = "APPROVED",
+    Rejected = "REJECTED",
+    Unverified = "UNVERIFIED"
+}
 declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;

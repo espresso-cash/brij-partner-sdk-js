@@ -5,7 +5,12 @@ import nacl from "tweetnacl";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import { documentTypeToJSON, WrappedData, WrappedValidation } from "./generated/protos/data";
+import {
+  documentTypeToJSON,
+  ValidationStatus as ProtoValidationStatus,
+  WrappedData,
+  WrappedValidation,
+} from "./generated/protos/data";
 
 const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
 
@@ -20,30 +25,30 @@ interface XFlowPartnerClientOptions {
   baseUrl?: string;
 }
 
-export type OrderIds = { orderId: string, externalId?: "" } | { orderId?: "", externalId: string };
+export type OrderIds = { orderId: string; externalId?: "" } | { orderId?: ""; externalId: string };
 
 export type CompleteOnRampOrderParams = OrderIds & { transactionId: string };
 
 export type FailOrderParams = OrderIds & { reason: string };
 
 export type AcceptOnRampOrderParams = {
-  orderId: string,
-  bankName: string,
-  bankAccount: string,
-  externalId?: string,
+  orderId: string;
+  bankName: string;
+  bankAccount: string;
+  externalId?: string;
 };
 
 export type AcceptOffRampOrderParams = {
-  orderId: string,
-  cryptoWalletAddress: string,
-  externalId?: string,
+  orderId: string;
+  cryptoWalletAddress: string;
+  externalId?: string;
 };
 
-export type RejectOrderParams = { orderId: string, reason: string };
+export type RejectOrderParams = { orderId: string; reason: string };
 
-export type DataAccessParams = { userPK: string, secretKey: string };
+export type DataAccessParams = { userPK: string; secretKey: string };
 
-export type UserDataField = { dataId: string, verified: boolean };
+export type UserDataField = { dataId: string; status: ValidationStatus };
 
 export type UserDataValueField<T> = { value: T } & UserDataField;
 
@@ -52,20 +57,37 @@ export type UserData = {
   phone: Array<UserDataValueField<string>>;
   name: Array<{ firstName: string; lastName: string } & UserDataField>;
   birthDate: Array<UserDataValueField<Date>>;
-  document: Array<{ type: string; number: string } & UserDataField>;
+  document: Array<{ type: string; number: string; countryCode: string } & UserDataField>;
   bankInfo: Array<{ bankName: string; accountNumber: string; bankCode: string } & UserDataField>;
   selfie: Array<UserDataValueField<Uint8Array>>;
   custom: Record<string, string>;
+};
+
+type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
+
+type CustomValidationResult = { type: string; value: string };
+
+export enum ValidationStatus {
+  Unspecified = "UNSPECIFIED",
+  Pending = "PENDING",
+  Approved = "APPROVED",
+  Rejected = "REJECTED",
+  Unverified = "UNVERIFIED",
 }
 
-type ValidationResult = {
-  dataId: string;
-  value: string;
-}
-
-type CustomValidationResult = {
-  type: string;
-  value: string;
+function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
+  switch (protoStatus) {
+    case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
+      return ValidationStatus.Unspecified;
+    case ProtoValidationStatus.VALIDATION_STATUS_PENDING:
+      return ValidationStatus.Pending;
+    case ProtoValidationStatus.VALIDATION_STATUS_APPROVED:
+      return ValidationStatus.Approved;
+    case ProtoValidationStatus.VALIDATION_STATUS_REJECTED:
+      return ValidationStatus.Rejected;
+    default:
+      return ValidationStatus.Unspecified;
+  }
 }
 
 class XFlowPartnerClient {
@@ -116,9 +138,7 @@ class XFlowPartnerClient {
   }
 
   private async init() {
-    await Promise.all([
-      this.generateAuthToken(),
-    ]);
+    await Promise.all([this.generateAuthToken()]);
   }
 
   private async generateAuthToken() {
@@ -133,28 +153,27 @@ class XFlowPartnerClient {
     const payload = {
       iss: this._authPublicKey,
       iat: Math.floor(Date.now() / 1000),
-      "aud": "kyc.espressocash.com",
+      aud: "kyc.espressocash.com",
     };
 
     const encodedHeader = base64url.encode(JSON.stringify(header));
     const encodedPayload = base64url.encode(JSON.stringify(payload));
     const dataToSign = `${encodedHeader}.${encodedPayload}`;
 
-    const signature = nacl.sign.detached(
-      new TextEncoder().encode(dataToSign),
-      privateKeyBytes,
-    );
+    const signature = nacl.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
 
     this._token = `${dataToSign}.${base64url.encode(signature)}`;
 
     this._apiClient = axios.create({
       baseURL: this.baseUrl,
-      headers: { "Authorization": `Bearer ${this._token}` },
+      headers: { Authorization: `Bearer ${this._token}` },
     });
   }
 
   async getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData> {
-    const response = await this._apiClient!.post("/v1/getUserData", { userPublicKey: userPK });
+    const response = await this._apiClient!.post("/v1/getUserData", {
+      userPublicKey: userPK,
+    });
     const responseData = response.data;
 
     const validationMap = new Map<string, ValidationResult>();
@@ -180,7 +199,8 @@ class XFlowPartnerClient {
       if (wrappedData.hash) {
         const result: ValidationResult = {
           dataId: encrypted.dataId,
-          value: wrappedData.hash,
+          value: wrappedData.hash.hash,
+          status: wrappedData.hash.status,
         };
         validationMap.set(result.dataId, result);
       } else if (wrappedData.custom) {
@@ -200,7 +220,7 @@ class XFlowPartnerClient {
       document: [],
       bankInfo: [],
       selfie: [],
-      custom,
+      custom: custom,
     };
 
     // User data
@@ -219,59 +239,43 @@ class XFlowPartnerClient {
       const dataId = encrypted.id;
       const verificationData = validationMap.get(dataId);
 
-      let verified = false;
+      let status = ValidationStatus.Unspecified;
       if (verificationData) {
         const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
         const hash = await this.generateHash(serializedData);
-        verified = hash === verificationData.value;
+        const hashMatching = hash === verificationData.value;
+        status = hashMatching ? toValidationStatus(verificationData.status) : ValidationStatus.Unverified;
       }
 
+      const commonFields: UserDataField = { dataId, status };
       if (wrappedData.email) {
-        userData.email.push({
-          value: wrappedData.email,
-          dataId,
-          verified,
-        });
+        userData.email.push({ value: wrappedData.email, ...commonFields });
       } else if (wrappedData.name) {
         userData.name.push({
           firstName: wrappedData.name.firstName,
           lastName: wrappedData.name.lastName,
-          dataId,
-          verified,
+          ...commonFields,
         });
       } else if (wrappedData.birthDate) {
-        userData.birthDate.push({
-          value: new Date(wrappedData.birthDate),
-          dataId,
-          verified,
-        });
+        userData.birthDate.push({ value: new Date(wrappedData.birthDate), ...commonFields });
       } else if (wrappedData.phone) {
-        userData.phone.push({
-          value: wrappedData.phone,
-          dataId,
-          verified,
-        });
+        userData.phone.push({ value: wrappedData.phone, ...commonFields });
       } else if (wrappedData.document) {
         userData.document.push({
           type: documentTypeToJSON(wrappedData.document.type),
           number: wrappedData.document.number,
-          dataId,
-          verified,
+          countryCode: wrappedData.document.countryCode,
+          ...commonFields,
         });
       } else if (wrappedData.bankInfo) {
         userData.bankInfo.push({
           bankName: wrappedData.bankInfo.bankName,
           accountNumber: wrappedData.bankInfo.accountNumber,
           bankCode: wrappedData.bankInfo.bankCode,
-          dataId,
-          verified,
+          ...commonFields,
         });
       } else if (wrappedData.selfieImage) {
-        userData.selfie.push({
-          value: wrappedData.selfieImage,
-          dataId,
-          verified,
-        });
+        userData.selfie.push({ value: wrappedData.selfieImage, ...commonFields });
       }
     }
 
@@ -362,12 +366,7 @@ class XFlowPartnerClient {
     const nonce = encryptedData.slice(0, nacl.box.nonceLength);
     const ciphertext = encryptedData.slice(nacl.box.nonceLength);
 
-    const decryptedSecretKey = nacl.box.open(
-      ciphertext,
-      nonce,
-      x25519PublicKey,
-      x25519PrivateKey,
-    );
+    const decryptedSecretKey = nacl.box.open(ciphertext, nonce, x25519PublicKey, x25519PrivateKey);
 
     if (!decryptedSecretKey) {
       throw new Error("Decryption failed");

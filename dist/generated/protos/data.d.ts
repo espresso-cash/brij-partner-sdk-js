@@ -7,6 +7,15 @@ export declare enum DocumentType {
 }
 export declare function documentTypeFromJSON(object: any): DocumentType;
 export declare function documentTypeToJSON(object: DocumentType): string;
+export declare enum ValidationStatus {
+    VALIDATION_STATUS_UNSPECIFIED = 0,
+    VALIDATION_STATUS_PENDING = 1,
+    VALIDATION_STATUS_APPROVED = 2,
+    VALIDATION_STATUS_REJECTED = 3,
+    UNRECOGNIZED = -1
+}
+export declare function validationStatusFromJSON(object: any): ValidationStatus;
+export declare function validationStatusToJSON(object: ValidationStatus): string;
 export interface WrappedData {
     email?: string | undefined;
     name?: Name | undefined;
@@ -23,6 +32,7 @@ export interface Name {
 export interface Document {
     type: DocumentType;
     number: string;
+    countryCode: string;
 }
 export interface BankInfo {
     accountNumber: string;
@@ -30,8 +40,12 @@ export interface BankInfo {
     bankName: string;
 }
 export interface WrappedValidation {
-    hash?: string | undefined;
+    hash?: HashValidation | undefined;
     custom?: CustomValidation | undefined;
+}
+export interface HashValidation {
+    hash: string;
+    status: ValidationStatus;
 }
 export interface CustomValidation {
     type: string;
@@ -42,6 +56,7 @@ export declare const Name: MessageFns<Name>;
 export declare const Document: MessageFns<Document>;
 export declare const BankInfo: MessageFns<BankInfo>;
 export declare const WrappedValidation: MessageFns<WrappedValidation>;
+export declare const HashValidation: MessageFns<HashValidation>;
 export declare const CustomValidation: MessageFns<CustomValidation>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
