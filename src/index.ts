@@ -58,13 +58,7 @@ export type UserData = {
   name: Array<{ firstName: string; lastName: string } & UserDataField>;
   birthDate: Array<UserDataValueField<Date>>;
   document: Array<{ type: string; number: string; countryCode: string } & UserDataField>;
-  bankInfo: Array<
-    {
-      bankName: string;
-      accountNumber: string;
-      bankCode: string;
-    } & UserDataField
-  >;
+  bankInfo: Array<{ bankName: string; accountNumber: string; bankCode: string } & UserDataField>;
   selfie: Array<UserDataValueField<Uint8Array>>;
   custom: Record<string, string>;
 };
