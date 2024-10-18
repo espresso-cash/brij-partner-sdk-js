@@ -159,42 +159,29 @@ class XFlowPartnerClient {
                 const hashMatching = hash === verificationData.value;
                 status = hashMatching ? toValidationStatus(verificationData.status) : ValidationStatus.Unverified;
             }
+            const commonFields = { dataId, status };
             if (wrappedData.email) {
-                userData.email.push({
-                    value: wrappedData.email,
-                    dataId,
-                    status,
-                });
+                userData.email.push({ value: wrappedData.email, ...commonFields });
             }
             else if (wrappedData.name) {
                 userData.name.push({
                     firstName: wrappedData.name.firstName,
                     lastName: wrappedData.name.lastName,
-                    dataId,
-                    status,
+                    ...commonFields,
                 });
             }
             else if (wrappedData.birthDate) {
-                userData.birthDate.push({
-                    value: new Date(wrappedData.birthDate),
-                    dataId,
-                    status,
-                });
+                userData.birthDate.push({ value: new Date(wrappedData.birthDate), ...commonFields });
             }
             else if (wrappedData.phone) {
-                userData.phone.push({
-                    value: wrappedData.phone,
-                    dataId,
-                    status,
-                });
+                userData.phone.push({ value: wrappedData.phone, ...commonFields });
             }
             else if (wrappedData.document) {
                 userData.document.push({
                     type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
                     countryCode: wrappedData.document.countryCode,
-                    dataId,
-                    status,
+                    ...commonFields,
                 });
             }
             else if (wrappedData.bankInfo) {
@@ -202,16 +189,11 @@ class XFlowPartnerClient {
                     bankName: wrappedData.bankInfo.bankName,
                     accountNumber: wrappedData.bankInfo.accountNumber,
                     bankCode: wrappedData.bankInfo.bankCode,
-                    dataId,
-                    status,
+                    ...commonFields,
                 });
             }
             else if (wrappedData.selfieImage) {
-                userData.selfie.push({
-                    value: wrappedData.selfieImage,
-                    dataId,
-                    status,
-                });
+                userData.selfie.push({ value: wrappedData.selfieImage, ...commonFields });
             }
         }
         return userData;
