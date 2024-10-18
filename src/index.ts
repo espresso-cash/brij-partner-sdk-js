@@ -63,16 +63,9 @@ export type UserData = {
   custom: Record<string, string>;
 };
 
-type ValidationResult = {
-  dataId: string;
-  value: string;
-  status: ProtoValidationStatus;
-};
+type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
 
-type CustomValidationResult = {
-  type: string;
-  value: string;
-};
+type CustomValidationResult = { type: string; value: string };
 
 export enum ValidationStatus {
   Unspecified = "UNSPECIFIED",
