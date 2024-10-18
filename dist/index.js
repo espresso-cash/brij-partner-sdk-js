@@ -15,7 +15,6 @@ export var ValidationStatus;
     ValidationStatus["Rejected"] = "REJECTED";
     ValidationStatus["Unverified"] = "UNVERIFIED";
 })(ValidationStatus || (ValidationStatus = {}));
-// Add this conversion function
 function toValidationStatus(protoStatus) {
     switch (protoStatus) {
         case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
