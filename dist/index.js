@@ -5,7 +5,7 @@ import nacl from "tweetnacl";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import { documentTypeToJSON, ValidationStatus as ProtoValidationStatus, WrappedData, WrappedValidation } from "./generated/protos/data";
+import { documentTypeToJSON, ValidationStatus as ProtoValidationStatus, WrappedData, WrappedValidation, } from "./generated/protos/data";
 const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
 export var ValidationStatus;
 (function (ValidationStatus) {
@@ -70,9 +70,7 @@ class XFlowPartnerClient {
         return client;
     }
     async init() {
-        await Promise.all([
-            this.generateAuthToken(),
-        ]);
+        await Promise.all([this.generateAuthToken()]);
     }
     async generateAuthToken() {
         const [publicKeyBytes, privateKeyBytes] = await Promise.all([
@@ -84,7 +82,7 @@ class XFlowPartnerClient {
         const payload = {
             iss: this._authPublicKey,
             iat: Math.floor(Date.now() / 1000),
-            "aud": "kyc.espressocash.com",
+            aud: "kyc.espressocash.com",
         };
         const encodedHeader = base64url.encode(JSON.stringify(header));
         const encodedPayload = base64url.encode(JSON.stringify(payload));
@@ -93,11 +91,13 @@ class XFlowPartnerClient {
         this._token = `${dataToSign}.${base64url.encode(signature)}`;
         this._apiClient = axios.create({
             baseURL: this.baseUrl,
-            headers: { "Authorization": `Bearer ${this._token}` },
+            headers: { Authorization: `Bearer ${this._token}` },
         });
     }
     async getUserData({ userPK, secretKey }) {
-        const response = await this._apiClient.post("/v1/getUserData", { userPublicKey: userPK });
+        const response = await this._apiClient.post("/v1/getUserData", {
+            userPublicKey: userPK,
+        });
         const responseData = response.data;
         const validationMap = new Map();
         const custom = {};
@@ -131,14 +131,14 @@ class XFlowPartnerClient {
             }
         }
         const userData = {
-            email: null,
-            phone: null,
-            name: null,
-            birthDate: null,
-            document: null,
-            bankInfo: null,
-            selfie: null,
-            custom: Object.keys(custom).length > 0 ? custom : null,
+            email: [],
+            phone: [],
+            name: [],
+            birthDate: [],
+            document: [],
+            bankInfo: [],
+            selfie: [],
+            custom: custom,
         };
         // User data
         for (const encrypted of responseData.userData) {
@@ -157,13 +157,9 @@ class XFlowPartnerClient {
                 const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
                 const hash = await this.generateHash(serializedData);
                 const hashMatching = hash === verificationData.value;
-                status = hashMatching
-                    ? toValidationStatus(verificationData.status)
-                    : ValidationStatus.Unverified;
+                status = hashMatching ? toValidationStatus(verificationData.status) : ValidationStatus.Unverified;
             }
             if (wrappedData.email) {
-                if (!userData.email)
-                    userData.email = [];
                 userData.email.push({
                     value: wrappedData.email,
                     dataId,
@@ -171,8 +167,6 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.name) {
-                if (!userData.name)
-                    userData.name = [];
                 userData.name.push({
                     firstName: wrappedData.name.firstName,
                     lastName: wrappedData.name.lastName,
@@ -181,8 +175,6 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.birthDate) {
-                if (!userData.birthDate)
-                    userData.birthDate = [];
                 userData.birthDate.push({
                     value: new Date(wrappedData.birthDate),
                     dataId,
@@ -190,8 +182,6 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.phone) {
-                if (!userData.phone)
-                    userData.phone = [];
                 userData.phone.push({
                     value: wrappedData.phone,
                     dataId,
@@ -199,8 +189,6 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.document) {
-                if (!userData.document)
-                    userData.document = [];
                 userData.document.push({
                     type: documentTypeToJSON(wrappedData.document.type),
                     number: wrappedData.document.number,
@@ -210,8 +198,6 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.bankInfo) {
-                if (!userData.bankInfo)
-                    userData.bankInfo = [];
                 userData.bankInfo.push({
                     bankName: wrappedData.bankInfo.bankName,
                     accountNumber: wrappedData.bankInfo.accountNumber,
@@ -221,8 +207,6 @@ class XFlowPartnerClient {
                 });
             }
             else if (wrappedData.selfieImage) {
-                if (!userData.selfie)
-                    userData.selfie = [];
                 userData.selfie.push({
                     value: wrappedData.selfieImage,
                     dataId,
