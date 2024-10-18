@@ -120,6 +120,7 @@ You will receive the following structure, where you can see data and verificatio
     {
       "type": "DOCUMENT_TYPE_VOTER_ID",
       "number": "1233123",
+      "countryCode": "NG",
       "dataId": "3943bec8-b88d-450d-816b-3faab743ff24",
       "verified": false
     }
@@ -135,21 +136,15 @@ You will receive the following structure, where you can see data and verificatio
   ],
   "selfie": [
     {
-     "value": {
-      "1": 60,
-      "2": 115,
-      "3": 118,
-      "4": 103,
-      "5": 32,
-      "6": 119,
-      "7": 105,
-      "8": 100,
-      "9": 116,
-      "10": 104,
-      "11": 61,
-      "12": 34,
-      //...
-        },
+      "value": {
+        "1": 60,
+        "2": 115,
+        "3": 118,
+        "4": 103,
+        "5": 32,
+        "6": 119
+        //...
+      },
       "dataId": "372b9e44-300c-443a-882b-a3234142429",
       "verified": false
     }
@@ -159,7 +154,9 @@ You will receive the following structure, where you can see data and verificatio
   }
 }
 ```
+
 > [!NOTE]
+>
 > - The `verified` flag indicates whether the information has been verified.
 > - Its possible to have empty arrays meaning no data is available.
 > - The `custom` field contains verification results from external sources like SmileID and etc.
