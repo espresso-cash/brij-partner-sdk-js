@@ -387,7 +387,7 @@ export const Document: MessageFns<Document> = {
       writer.uint32(18).string(message.number);
     }
     if (message.countryCode !== "") {
-      writer.uint32(66).string(message.countryCode);
+      writer.uint32(26).string(message.countryCode);
     }
     return writer;
   },
@@ -415,8 +415,8 @@ export const Document: MessageFns<Document> = {
           message.number = reader.string();
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
