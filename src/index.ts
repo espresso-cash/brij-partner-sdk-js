@@ -77,7 +77,6 @@ export enum ValidationStatus {
   Unverified = "UNVERIFIED",
 }
 
-// Add this conversion function
 function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
   switch (protoStatus) {
     case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
