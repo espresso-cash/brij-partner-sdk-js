@@ -65,7 +65,7 @@ export declare enum ValidationStatus {
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
-declare class XFlowPartnerClient {
+export declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;
     private _authPublicKey;
@@ -97,4 +97,3 @@ declare class XFlowPartnerClient {
     private decryptData;
     private generateHash;
 }
-export { XFlowPartnerClient };

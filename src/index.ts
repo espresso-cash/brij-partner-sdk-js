@@ -90,7 +90,7 @@ function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatu
   }
 }
 
-class XFlowPartnerClient {
+export class XFlowPartnerClient {
   private authKeyPair: AuthKeyPair;
   private readonly baseUrl: string;
   private _authPublicKey: string;
@@ -392,5 +392,3 @@ class XFlowPartnerClient {
     return createHash("sha256").update(value).digest("hex");
   }
 }
-
-export { XFlowPartnerClient };
