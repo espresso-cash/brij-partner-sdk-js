@@ -75,6 +75,26 @@ export enum ValidationStatus {
   Unverified = "UNVERIFIED",
 }
 
+export type Order = {
+  orderId: string;
+  externalId?: string;
+  created: string;
+  status: string;
+  partnerPublicKey: string;
+  userPublicKey: string;
+  comment: string;
+  type: "ON_RAMP" | "OFF_RAMP";
+  cryptoAmount: string;
+  cryptoCurrency: string;
+  fiatAmount: string;
+  fiatCurrency: string;
+  bankName: string;
+  bankAccount: string;
+  cryptoWalletAddress: string;
+  transaction: string;
+  transactionId: string;
+};
+
 function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
   switch (protoStatus) {
     case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
@@ -117,7 +137,7 @@ export class XFlowPartnerClient {
     };
   }
 
-  static async fromSeed(seed: string) {
+  static async fromSeed(seed: string): Promise<XFlowPartnerClient> {
     const decoded = base58.decode(seed);
     const authKeyPair = nacl.sign.keyPair.fromSeed(decoded);
 
@@ -282,7 +302,7 @@ export class XFlowPartnerClient {
     return userData;
   }
 
-  async getOrder({ externalId, orderId }: OrderIds) {
+  async getOrder({ externalId, orderId }: OrderIds): Promise<Order> {
     const response = await this._apiClient!.post("/v1/getOrder", {
       orderId: orderId,
       externalId: externalId,
@@ -291,13 +311,13 @@ export class XFlowPartnerClient {
     return response.data;
   }
 
-  async getPartnerOrders() {
+  async getPartnerOrders(): Promise<Order[]> {
     const response = await this._apiClient!.post("/v1/getPartnerOrders");
 
     return response.data;
   }
 
-  async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams) {
+  async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void> {
     await this._apiClient!.post("/v1/acceptOrder", {
       orderId: orderId,
       bankName: bankName,
@@ -306,7 +326,7 @@ export class XFlowPartnerClient {
     });
   }
 
-  async completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams) {
+  async completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void> {
     await this._apiClient!.post("/v1/completeOrder", {
       orderId: orderId,
       transactionId: transactionId,
@@ -314,7 +334,7 @@ export class XFlowPartnerClient {
     });
   }
 
-  async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams) {
+  async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void> {
     await this._apiClient!.post("/v1/acceptOrder", {
       orderId: orderId,
       cryptoWalletAddress: cryptoWalletAddress,
@@ -322,14 +342,14 @@ export class XFlowPartnerClient {
     });
   }
 
-  async completeOffRampOrder({ orderId, externalId }: OrderIds) {
+  async completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void> {
     await this._apiClient!.post("/v1/completeOrder", {
       orderId: orderId,
       externalId: externalId,
     });
   }
 
-  async failOrder({ orderId, reason, externalId }: FailOrderParams) {
+  async failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void> {
     await this._apiClient!.post("/v1/failOrder", {
       orderId: orderId,
       reason: reason,
@@ -337,7 +357,7 @@ export class XFlowPartnerClient {
     });
   }
 
-  async rejectOrder({ orderId, reason }: RejectOrderParams) {
+  async rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void> {
     await this._apiClient!.post("/v1/rejectOrder", {
       orderId: orderId,
       reason: reason,
@@ -375,7 +395,7 @@ export class XFlowPartnerClient {
     return base58.encode(decryptedSecretKey);
   }
 
-  private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array) {
+  private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array): Promise<Uint8Array> {
     const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
     const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
 
@@ -388,7 +408,7 @@ export class XFlowPartnerClient {
     return decrypted;
   }
 
-  private async generateHash(value: string) {
+  private async generateHash(value: string): Promise<string> {
     return createHash("sha256").update(value).digest("hex");
   }
 }

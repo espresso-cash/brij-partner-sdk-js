@@ -65,6 +65,25 @@ export declare enum ValidationStatus {
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
+export type Order = {
+    orderId: string;
+    externalId?: string;
+    created: string;
+    status: string;
+    partnerPublicKey: string;
+    userPublicKey: string;
+    comment: string;
+    type: "ON_RAMP" | "OFF_RAMP";
+    cryptoAmount: string;
+    cryptoCurrency: string;
+    fiatAmount: string;
+    fiatCurrency: string;
+    bankName: string;
+    bankAccount: string;
+    cryptoWalletAddress: string;
+    transaction: string;
+    transactionId: string;
+};
 export declare class XFlowPartnerClient {
     private authKeyPair;
     private readonly baseUrl;
@@ -84,8 +103,8 @@ export declare class XFlowPartnerClient {
     private init;
     private generateAuthToken;
     getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
-    getOrder({ externalId, orderId }: OrderIds): Promise<any>;
-    getPartnerOrders(): Promise<any>;
+    getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
+    getPartnerOrders(): Promise<Order[]>;
     acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void>;
     completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void>;
     acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void>;
