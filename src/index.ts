@@ -261,8 +261,7 @@ export class XFlowPartnerClient {
 
       let status = ValidationStatus.Unspecified;
       if (verificationData) {
-        const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
-        const hash = await this.generateHash(serializedData);
+        const hash = await this.generateHash(wrappedData);
         const hashMatching = hash === verificationData.value;
         status = hashMatching ? toValidationStatus(verificationData.status) : ValidationStatus.Unverified;
       }
@@ -408,7 +407,8 @@ export class XFlowPartnerClient {
     return decrypted;
   }
 
-  private async generateHash(value: string): Promise<string> {
-    return createHash("sha256").update(value).digest("hex");
+  private async generateHash(value: WrappedData): Promise<string> {
+    const serializedData = WrappedData.encode(value).finish();
+    return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
   }
 }

@@ -154,8 +154,7 @@ export class XFlowPartnerClient {
             const verificationData = validationMap.get(dataId);
             let status = ValidationStatus.Unspecified;
             if (verificationData) {
-                const serializedData = new TextDecoder().decode(WrappedData.encode(wrappedData).finish());
-                const hash = await this.generateHash(serializedData);
+                const hash = await this.generateHash(wrappedData);
                 const hashMatching = hash === verificationData.value;
                 status = hashMatching ? toValidationStatus(verificationData.status) : ValidationStatus.Unverified;
             }
@@ -281,7 +280,8 @@ export class XFlowPartnerClient {
         return decrypted;
     }
     async generateHash(value) {
-        return createHash("sha256").update(value).digest("hex");
+        const serializedData = WrappedData.encode(value).finish();
+        return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
     }
 }
 //# sourceMappingURL=index.js.map
