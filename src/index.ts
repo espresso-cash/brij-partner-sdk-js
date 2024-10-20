@@ -10,7 +10,7 @@ import {
   ValidationStatus as ProtoValidationStatus,
   WrappedData,
   WrappedValidation,
-} from "./generated/protos/data";
+} from "./generated/protos/data.js";
 
 const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
 

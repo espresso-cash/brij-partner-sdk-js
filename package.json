@@ -1,6 +1,6 @@
 {
   "name": "xflow-partner-client",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,7 +20,6 @@
     "bs58": "^6.0.0",
     "ed2curve": "^0.3.0",
     "jose": "^5.8.0",
-    "ts-proto": "^2.2.3",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1"
   },
@@ -29,6 +28,7 @@
     "@types/ed2curve": "^0.2.4",
     "@types/node": "^22.7.4",
     "eslint": "^9.9.1",
+    "ts-proto": "^2.2.4",
     "typescript-eslint": "^8.3.0"
   }
 }
