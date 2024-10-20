@@ -1,6 +1,6 @@
 {
   "name": "xflow-partner-client",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@bufbuild/protobuf": "^2.2.0",
     "axios": "^1.7.5",
     "bs58": "^6.0.0",
     "ed2curve": "^0.3.0",
