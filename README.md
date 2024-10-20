@@ -163,7 +163,6 @@ You will receive the following structure, where you can see data and verificatio
 >   - `APPROVED`: The information has been verified and approved.
 >   - `REJECTED`: The information was checked but not approved.
 >   - `UNVERIFIED`: The information has not been verified.
-> - It's possible to have `null` value meaning no data is available.
 > - The `custom` field contains verification results from external sources like SmileID or other KYC providers.
 
 ### Accepting and Completing the On-Ramp Order
