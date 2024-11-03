@@ -6,7 +6,8 @@ import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
 import { documentTypeToJSON, ValidationStatus as ProtoValidationStatus, WrappedData, WrappedValidation, } from "./generated/protos/data.js";
-const _baseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
+const _kycBaseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
+const _orderBaseURL = "https://kyc-backend-orders-402681483920.europe-west1.run.app/";
 export var ValidationStatus;
 (function (ValidationStatus) {
     ValidationStatus["Unspecified"] = "UNSPECIFIED";
@@ -31,16 +32,18 @@ function toValidationStatus(protoStatus) {
 }
 export class XFlowPartnerClient {
     authKeyPair;
-    baseUrl;
+    kycBaseUrl;
+    orderBaseUrl;
     _authPublicKey;
-    _token;
-    _apiClient;
-    constructor({ authKeyPair, baseUrl }) {
+    _kycClient;
+    _orderClient;
+    constructor({ authKeyPair, kycBaseUrl, orderBaseUrl }) {
         this.authKeyPair = authKeyPair;
-        this.baseUrl = baseUrl || _baseURL;
+        this.kycBaseUrl = kycBaseUrl || _kycBaseURL;
+        this.orderBaseUrl = orderBaseUrl || _orderBaseURL;
         this._authPublicKey = "";
-        this._token = "";
-        this._apiClient = null;
+        this._kycClient = null;
+        this._orderClient = null;
     }
     static async generateKeyPair() {
         const keyPair = nacl.sign.keyPair();
@@ -78,24 +81,32 @@ export class XFlowPartnerClient {
             this.authKeyPair.getPrivateKeyBytes(),
         ]);
         this._authPublicKey = base58.encode(publicKeyBytes);
+        const kycToken = await this.createToken(privateKeyBytes, "kyc.espressocash.com");
+        this._kycClient = axios.create({
+            baseURL: this.kycBaseUrl,
+            headers: { Authorization: `Bearer ${kycToken}` },
+        });
+        const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
+        this._orderClient = axios.create({
+            baseURL: this.orderBaseUrl,
+            headers: { Authorization: `Bearer ${orderToken}` },
+        });
+    }
+    async createToken(privateKeyBytes, audience) {
         const header = { alg: "EdDSA", typ: "JWT" };
         const payload = {
             iss: this._authPublicKey,
             iat: Math.floor(Date.now() / 1000),
-            aud: "kyc.espressocash.com",
+            aud: audience,
         };
         const encodedHeader = base64url.encode(JSON.stringify(header));
         const encodedPayload = base64url.encode(JSON.stringify(payload));
         const dataToSign = `${encodedHeader}.${encodedPayload}`;
         const signature = nacl.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
-        this._token = `${dataToSign}.${base64url.encode(signature)}`;
-        this._apiClient = axios.create({
-            baseURL: this.baseUrl,
-            headers: { Authorization: `Bearer ${this._token}` },
-        });
+        return `${dataToSign}.${base64url.encode(signature)}`;
     }
     async getUserData({ userPK, secretKey }) {
-        const response = await this._apiClient.post("/v1/getUserData", {
+        const response = await this._kycClient.post("/v1/getUserData", {
             userPublicKey: userPK,
         });
         const responseData = response.data;
@@ -198,18 +209,18 @@ export class XFlowPartnerClient {
         return userData;
     }
     async getOrder({ externalId, orderId }) {
-        const response = await this._apiClient.post("/v1/getOrder", {
+        const response = await this._orderClient.post("/v1/getOrder", {
             orderId: orderId,
             externalId: externalId,
         });
         return response.data;
     }
     async getPartnerOrders() {
-        const response = await this._apiClient.post("/v1/getPartnerOrders");
+        const response = await this._orderClient.post("/v1/getPartnerOrders");
         return response.data;
     }
     async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }) {
-        await this._apiClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/acceptOrder", {
             orderId: orderId,
             bankName: bankName,
             bankAccount: bankAccount,
@@ -217,40 +228,40 @@ export class XFlowPartnerClient {
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
-        await this._apiClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/completeOrder", {
             orderId: orderId,
             transactionId: transactionId,
             externalId: externalId,
         });
     }
     async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
-        await this._apiClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/acceptOrder", {
             orderId: orderId,
             cryptoWalletAddress: cryptoWalletAddress,
             externalId: externalId,
         });
     }
     async completeOffRampOrder({ orderId, externalId }) {
-        await this._apiClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/completeOrder", {
             orderId: orderId,
             externalId: externalId,
         });
     }
     async failOrder({ orderId, reason, externalId }) {
-        await this._apiClient.post("/v1/failOrder", {
+        await this._orderClient.post("/v1/failOrder", {
             orderId: orderId,
             reason: reason,
             externalId: externalId,
         });
     }
     async rejectOrder({ orderId, reason }) {
-        await this._apiClient.post("/v1/rejectOrder", {
+        await this._orderClient.post("/v1/rejectOrder", {
             orderId: orderId,
             reason: reason,
         });
     }
     async getUserInfo(publicKey) {
-        const response = await this._apiClient.post("/v1/getInfo", {
+        const response = await this._kycClient.post("/v1/getInfo", {
             publicKey: publicKey,
         });
         return response.data;

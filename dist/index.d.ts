@@ -86,10 +86,11 @@ export type Order = {
 };
 export declare class XFlowPartnerClient {
     private authKeyPair;
-    private readonly baseUrl;
+    private readonly kycBaseUrl;
+    private readonly orderBaseUrl;
     private _authPublicKey;
-    private _token;
-    private _apiClient;
+    private _kycClient;
+    private _orderClient;
     private constructor();
     static generateKeyPair(): Promise<{
         publicKey: string;
@@ -102,6 +103,7 @@ export declare class XFlowPartnerClient {
     static fromSeed(seed: string): Promise<XFlowPartnerClient>;
     private init;
     private generateAuthToken;
+    private createToken;
     getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
     getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
     getPartnerOrders(): Promise<Order[]>;
