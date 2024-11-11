@@ -355,12 +355,26 @@ export class XFlowPartnerClient {
     );
   }
 
-  async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void> {
+  async acceptOnRampOrder({
+    orderId,
+    bankName,
+    bankAccount,
+    externalId,
+    secretKey,
+  }: AcceptOnRampOrderParams & { secretKey: string }): Promise<void> {
+    const key = base58.decode(secretKey);
+
+    const encryptField = (value: string) => {
+      const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+      const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(value), nonce, key);
+      return naclUtil.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
+    };
+
     await this._orderClient!.post("/v1/acceptOrder", {
-      orderId: orderId,
-      bankName: bankName,
-      bankAccount: bankAccount,
-      externalId: externalId,
+      orderId,
+      bankName: encryptField(bankName),
+      bankAccount: encryptField(bankAccount),
+      externalId,
     });
   }
 

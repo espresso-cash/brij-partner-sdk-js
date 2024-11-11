@@ -105,9 +105,12 @@ export declare class XFlowPartnerClient {
     private generateAuthToken;
     private createToken;
     getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
+    private decryptOrderFields;
     getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
     getPartnerOrders(): Promise<Order[]>;
-    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void>;
+    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, secretKey, }: AcceptOnRampOrderParams & {
+        secretKey: string;
+    }): Promise<void>;
     completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void>;
     acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void>;
     completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void>;

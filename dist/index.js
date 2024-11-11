@@ -208,23 +208,51 @@ export class XFlowPartnerClient {
         }
         return userData;
     }
+    async decryptOrderFields(order, secretKey) {
+        const decryptField = async (field) => {
+            if (!field)
+                return "";
+            try {
+                const encryptedData = naclUtil.decodeBase64(field);
+                return new TextDecoder().decode(await this.decryptData(encryptedData, secretKey));
+            }
+            catch {
+                return field;
+            }
+        };
+        return {
+            ...order,
+            bankAccount: await decryptField(order.bankAccount),
+            bankName: await decryptField(order.bankName),
+        };
+    }
     async getOrder({ externalId, orderId }) {
         const response = await this._orderClient.post("/v1/getOrder", {
             orderId: orderId,
             externalId: externalId,
         });
-        return response.data;
+        const secretKey = await this.getUserSecretKey(response.data.userPublicKey);
+        return this.decryptOrderFields(response.data, base58.decode(secretKey));
     }
     async getPartnerOrders() {
         const response = await this._orderClient.post("/v1/getPartnerOrders");
-        return response.data;
+        return Promise.all(response.data.orders.map(async (order) => {
+            const secretKey = await this.getUserSecretKey(order.userPublicKey);
+            return this.decryptOrderFields(order, base58.decode(secretKey));
+        }));
     }
-    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }) {
+    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, secretKey, }) {
+        const key = base58.decode(secretKey);
+        const encryptField = (value) => {
+            const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+            const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(value), nonce, key);
+            return naclUtil.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
+        };
         await this._orderClient.post("/v1/acceptOrder", {
-            orderId: orderId,
-            bankName: bankName,
-            bankAccount: bankAccount,
-            externalId: externalId,
+            orderId,
+            bankName: encryptField(bankName),
+            bankAccount: encryptField(bankAccount),
+            externalId,
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
