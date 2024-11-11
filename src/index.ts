@@ -316,19 +316,43 @@ export class XFlowPartnerClient {
     return userData;
   }
 
+  private async decryptOrderFields(order: Order, secretKey: Uint8Array): Promise<Order> {
+    const decryptField = async (field: string | undefined) => {
+      if (!field) return "";
+      try {
+        const encryptedData = naclUtil.decodeBase64(field);
+        return new TextDecoder().decode(await this.decryptData(encryptedData, secretKey));
+      } catch {
+        return field;
+      }
+    };
+
+    return {
+      ...order,
+      bankAccount: await decryptField(order.bankAccount),
+      bankName: await decryptField(order.bankName),
+    };
+  }
+
   async getOrder({ externalId, orderId }: OrderIds): Promise<Order> {
     const response = await this._orderClient!.post("/v1/getOrder", {
       orderId: orderId,
       externalId: externalId,
     });
 
-    return response.data;
+    const secretKey = await this.getUserSecretKey(response.data.userPublicKey);
+    return this.decryptOrderFields(response.data, base58.decode(secretKey));
   }
 
   async getPartnerOrders(): Promise<Order[]> {
     const response = await this._orderClient!.post("/v1/getPartnerOrders");
 
-    return response.data;
+    return Promise.all(
+      response.data.orders.map(async (order: Order) => {
+        const secretKey = await this.getUserSecretKey(order.userPublicKey);
+        return this.decryptOrderFields(order, base58.decode(secretKey));
+      })
+    );
   }
 
   async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void> {
