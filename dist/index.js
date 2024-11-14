@@ -208,36 +208,136 @@ export class XFlowPartnerClient {
         }
         return userData;
     }
+    async decryptOrderFields(order, secretKey) {
+        const decryptField = async (field) => {
+            if (!field)
+                return "";
+            try {
+                const encryptedData = naclUtil.decodeBase64(field);
+                return new TextDecoder().decode(await this.decryptData(encryptedData, secretKey));
+            }
+            catch {
+                return field;
+            }
+        };
+        return {
+            ...order,
+            bankAccount: await decryptField(order.bankAccount),
+            bankName: await decryptField(order.bankName),
+        };
+    }
+    async processOrder(order, secretKey) {
+        const decryptedOrder = await this.decryptOrderFields(order, secretKey);
+        if (order.userSignature) {
+            const userVerifyKey = base58.decode(order.userPublicKey);
+            const userMessage = order.type === "ON_RAMP"
+                ? this.createUserOnRampMessage({
+                    cryptoAmount: order.cryptoAmount,
+                    cryptoCurrency: order.cryptoCurrency,
+                    fiatAmount: order.fiatAmount,
+                    fiatCurrency: order.fiatCurrency,
+                })
+                : this.createUserOffRampMessage({
+                    cryptoAmount: order.cryptoAmount,
+                    cryptoCurrency: order.cryptoCurrency,
+                    fiatAmount: order.fiatAmount,
+                    fiatCurrency: order.fiatCurrency,
+                    bankName: decryptedOrder.bankName,
+                    bankAccount: decryptedOrder.bankAccount,
+                });
+            const isValidUserSig = nacl.sign.detached.verify(new TextEncoder().encode(userMessage), base58.decode(order.userSignature), userVerifyKey);
+            if (!isValidUserSig) {
+                throw new Error("Invalid user signature");
+            }
+        }
+        if (order.partnerSignature) {
+            const partnerVerifyKey = base58.decode(order.partnerPublicKey);
+            const partnerMessage = order.type === "ON_RAMP"
+                ? this.createPartnerOnRampMessage({
+                    cryptoAmount: order.cryptoAmount,
+                    cryptoCurrency: order.cryptoCurrency,
+                    fiatAmount: order.fiatAmount,
+                    fiatCurrency: order.fiatCurrency,
+                    bankName: decryptedOrder.bankName,
+                    bankAccount: decryptedOrder.bankAccount,
+                })
+                : this.createPartnerOffRampMessage({
+                    cryptoAmount: order.cryptoAmount,
+                    cryptoCurrency: order.cryptoCurrency,
+                    fiatAmount: order.fiatAmount,
+                    fiatCurrency: order.fiatCurrency,
+                    cryptoWalletAddress: order.cryptoWalletAddress,
+                });
+            const isValidPartnerSig = nacl.sign.detached.verify(new TextEncoder().encode(partnerMessage), base58.decode(order.partnerSignature), partnerVerifyKey);
+            if (!isValidPartnerSig) {
+                throw new Error("Invalid partner signature");
+            }
+        }
+        return decryptedOrder;
+    }
     async getOrder({ externalId, orderId }) {
         const response = await this._orderClient.post("/v1/getOrder", {
-            orderId: orderId,
-            externalId: externalId,
+            orderId,
+            externalId,
         });
-        return response.data;
+        const secretKey = await this.getUserSecretKey(response.data.userPublicKey);
+        return this.processOrder(response.data, base58.decode(secretKey));
     }
     async getPartnerOrders() {
         const response = await this._orderClient.post("/v1/getPartnerOrders");
-        return response.data;
+        return Promise.all(response.data.orders.map(async (order) => {
+            const secretKey = await this.getUserSecretKey(order.userPublicKey);
+            return this.processOrder(order, base58.decode(secretKey));
+        }));
     }
-    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }) {
+    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }) {
+        const key = base58.decode(userSecretKey);
+        const order = await this.getOrder({ orderId });
+        const encryptField = (value) => {
+            const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+            const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(value), nonce, key);
+            return naclUtil.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
+        };
+        const signatureMessage = this.createPartnerOnRampMessage({
+            cryptoAmount: order.cryptoAmount,
+            cryptoCurrency: order.cryptoCurrency,
+            fiatAmount: order.fiatAmount,
+            fiatCurrency: order.fiatCurrency,
+            bankName,
+            bankAccount,
+        });
+        const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
+        const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
         await this._orderClient.post("/v1/acceptOrder", {
-            orderId: orderId,
-            bankName: bankName,
-            bankAccount: bankAccount,
-            externalId: externalId,
+            orderId,
+            bankName: encryptField(bankName),
+            bankAccount: encryptField(bankAccount),
+            externalId,
+            partnerSignature: base58.encode(signature),
+        });
+    }
+    async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
+        const order = await this.getOrder({ orderId });
+        const signatureMessage = this.createPartnerOffRampMessage({
+            cryptoAmount: order.cryptoAmount,
+            cryptoCurrency: order.cryptoCurrency,
+            fiatAmount: order.fiatAmount,
+            fiatCurrency: order.fiatCurrency,
+            cryptoWalletAddress,
+        });
+        const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
+        const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+        await this._orderClient.post("/v1/acceptOrder", {
+            orderId,
+            cryptoWalletAddress,
+            externalId,
+            partnerSignature: base58.encode(signature),
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
         await this._orderClient.post("/v1/completeOrder", {
             orderId: orderId,
             transactionId: transactionId,
-            externalId: externalId,
-        });
-    }
-    async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
-        await this._orderClient.post("/v1/acceptOrder", {
-            orderId: orderId,
-            cryptoWalletAddress: cryptoWalletAddress,
             externalId: externalId,
         });
     }
@@ -293,6 +393,18 @@ export class XFlowPartnerClient {
     async generateHash(value) {
         const serializedData = WrappedData.encode(value).finish();
         return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
+    }
+    createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, }) {
+        return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}`;
+    }
+    createUserOffRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, bankName, bankAccount, }) {
+        return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
+    }
+    createPartnerOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, bankName, bankAccount, }) {
+        return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
+    }
+    createPartnerOffRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, cryptoWalletAddress, }) {
+        return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
     }
 }
 //# sourceMappingURL=index.js.map

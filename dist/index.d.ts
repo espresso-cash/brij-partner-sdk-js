@@ -83,6 +83,8 @@ export type Order = {
     cryptoWalletAddress: string;
     transaction: string;
     transactionId: string;
+    userSignature?: string;
+    partnerSignature?: string;
 };
 export declare class XFlowPartnerClient {
     private authKeyPair;
@@ -105,11 +107,15 @@ export declare class XFlowPartnerClient {
     private generateAuthToken;
     private createToken;
     getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
+    private decryptOrderFields;
+    private processOrder;
     getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
     getPartnerOrders(): Promise<Order[]>;
-    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId }: AcceptOnRampOrderParams): Promise<void>;
-    completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void>;
+    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }: AcceptOnRampOrderParams & {
+        userSecretKey: string;
+    }): Promise<void>;
     acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void>;
+    completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void>;
     completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void>;
     failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void>;
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
@@ -117,4 +123,8 @@ export declare class XFlowPartnerClient {
     getUserSecretKey(publicKey: string): Promise<string>;
     private decryptData;
     private generateHash;
+    private createUserOnRampMessage;
+    private createUserOffRampMessage;
+    private createPartnerOnRampMessage;
+    private createPartnerOffRampMessage;
 }
