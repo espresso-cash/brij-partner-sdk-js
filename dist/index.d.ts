@@ -86,7 +86,7 @@ export type Order = {
     userSignature?: string;
     partnerSignature?: string;
 };
-export declare class XFlowPartnerClient {
+export declare class BrijPartnerClient {
     private authKeyPair;
     private readonly kycBaseUrl;
     private readonly orderBaseUrl;
@@ -102,7 +102,7 @@ export declare class XFlowPartnerClient {
         getPublicKeyBytes: () => Promise<Uint8Array>;
         getPrivateKeyBytes: () => Promise<Uint8Array>;
     }>;
-    static fromSeed(seed: string): Promise<XFlowPartnerClient>;
+    static fromSeed(seed: string): Promise<BrijPartnerClient>;
     private init;
     private generateAuthToken;
     private createToken;
