@@ -45,7 +45,7 @@ function toValidationStatus(protoStatus) {
             return ValidationStatus.Unspecified;
     }
 }
-export class XFlowPartnerClient {
+export class BrijPartnerClient {
     authKeyPair;
     kycBaseUrl;
     orderBaseUrl;
@@ -74,7 +74,7 @@ export class XFlowPartnerClient {
     static async fromSeed(seed) {
         const decoded = base58.decode(seed);
         const authKeyPair = nacl.sign.keyPair.fromSeed(decoded);
-        const client = new XFlowPartnerClient({
+        const client = new BrijPartnerClient({
             authKeyPair: {
                 async getPrivateKeyBytes() {
                     return authKeyPair.secretKey;

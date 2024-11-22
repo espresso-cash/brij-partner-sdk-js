@@ -46,7 +46,7 @@ export class AppConfig {
   }
 }
 
-interface XFlowPartnerClientOptions {
+interface BrijPartnerClientOptions {
   authKeyPair: AuthKeyPair;
   appConfig?: AppConfig;
 }
@@ -138,7 +138,7 @@ function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatu
   }
 }
 
-export class XFlowPartnerClient {
+export class BrijPartnerClient {
   private authKeyPair: AuthKeyPair;
   private readonly kycBaseUrl: string;
   private readonly orderBaseUrl: string;
@@ -146,7 +146,7 @@ export class XFlowPartnerClient {
   private _kycClient: AxiosInstance | null;
   private _orderClient: AxiosInstance | null;
 
-  private constructor({ authKeyPair, appConfig = AppConfig.demo() }: XFlowPartnerClientOptions) {
+  private constructor({ authKeyPair, appConfig = AppConfig.demo() }: BrijPartnerClientOptions) {
     this.authKeyPair = authKeyPair;
     this.kycBaseUrl = appConfig.storageBaseUrl;
     this.orderBaseUrl = appConfig.orderBaseUrl;
@@ -167,11 +167,11 @@ export class XFlowPartnerClient {
     };
   }
 
-  static async fromSeed(seed: string): Promise<XFlowPartnerClient> {
+  static async fromSeed(seed: string): Promise<BrijPartnerClient> {
     const decoded = base58.decode(seed);
     const authKeyPair = nacl.sign.keyPair.fromSeed(decoded);
 
-    const client = new XFlowPartnerClient({
+    const client = new BrijPartnerClient({
       authKeyPair: {
         async getPrivateKeyBytes() {
           return authKeyPair.secretKey;
