@@ -3,7 +3,7 @@
 ## Install SDK
 
 ```
-npm install https://github.com/espresso-cash/xflow-partner-client
+npm install https://github.com/espresso-cash/brij-partner-sdk-js
 ```
 
 ## Register your Partner's Public Key
