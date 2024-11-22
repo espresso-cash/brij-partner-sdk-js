@@ -12,19 +12,43 @@ import {
   WrappedValidation,
 } from "./generated/protos/data.js";
 
-const _kycBaseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
-const _orderBaseURL = "https://kyc-backend-orders-402681483920.europe-west1.run.app/";
-
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
 
   getPublicKeyBytes(): Promise<Uint8Array>;
 }
 
+export class AppConfig {
+  readonly storageBaseUrl: string;
+  readonly orderBaseUrl: string;
+
+  private constructor(storageBaseUrl: string, orderBaseUrl: string) {
+    this.storageBaseUrl = storageBaseUrl;
+    this.orderBaseUrl = orderBaseUrl;
+  }
+
+  static demo() {
+    return new AppConfig(
+      'https://kyc-backend-oxvpvdtvzq-ew.a.run.app/',
+      'https://kyc-backend-orders-402681483920.europe-west1.run.app/'
+    );
+  }
+
+  static production() {
+    return new AppConfig(
+      'https://storage.brij.fi/',
+      'https://orders.brij.fi/'
+    );
+  }
+
+  static custom(storageBaseUrl: string, orderBaseUrl: string) {
+    return new AppConfig(storageBaseUrl, orderBaseUrl);
+  }
+}
+
 interface BrijPartnerClientOptions {
   authKeyPair: AuthKeyPair;
-  kycBaseUrl?: string;
-  orderBaseUrl?: string;
+  appConfig?: AppConfig;
 }
 
 export type OrderIds = { orderId: string; externalId?: "" } | { orderId?: ""; externalId: string };
@@ -122,10 +146,10 @@ export class BrijPartnerClient {
   private _kycClient: AxiosInstance | null;
   private _orderClient: AxiosInstance | null;
 
-  private constructor({ authKeyPair, kycBaseUrl, orderBaseUrl }: BrijPartnerClientOptions) {
+  private constructor({ authKeyPair, appConfig = AppConfig.demo() }: BrijPartnerClientOptions) {
     this.authKeyPair = authKeyPair;
-    this.kycBaseUrl = kycBaseUrl || _kycBaseURL;
-    this.orderBaseUrl = orderBaseUrl || _orderBaseURL;
+    this.kycBaseUrl = appConfig.storageBaseUrl;
+    this.orderBaseUrl = appConfig.orderBaseUrl;
     this._authPublicKey = "";
     this._kycClient = null;
     this._orderClient = null;
