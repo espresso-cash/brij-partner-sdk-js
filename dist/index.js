@@ -6,8 +6,23 @@ import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
 import { documentTypeToJSON, ValidationStatus as ProtoValidationStatus, WrappedData, WrappedValidation, } from "./generated/protos/data.js";
-const _kycBaseURL = "https://kyc-backend-oxvpvdtvzq-ew.a.run.app";
-const _orderBaseURL = "https://kyc-backend-orders-402681483920.europe-west1.run.app/";
+export class AppConfig {
+    storageBaseUrl;
+    orderBaseUrl;
+    constructor(storageBaseUrl, orderBaseUrl) {
+        this.storageBaseUrl = storageBaseUrl;
+        this.orderBaseUrl = orderBaseUrl;
+    }
+    static demo() {
+        return new AppConfig('https://kyc-backend-oxvpvdtvzq-ew.a.run.app/', 'https://kyc-backend-orders-402681483920.europe-west1.run.app/');
+    }
+    static production() {
+        return new AppConfig('https://storage.brij.fi/', 'https://orders.brij.fi/');
+    }
+    static custom(storageBaseUrl, orderBaseUrl) {
+        return new AppConfig(storageBaseUrl, orderBaseUrl);
+    }
+}
 export var ValidationStatus;
 (function (ValidationStatus) {
     ValidationStatus["Unspecified"] = "UNSPECIFIED";
@@ -37,10 +52,10 @@ export class XFlowPartnerClient {
     _authPublicKey;
     _kycClient;
     _orderClient;
-    constructor({ authKeyPair, kycBaseUrl, orderBaseUrl }) {
+    constructor({ authKeyPair, appConfig = AppConfig.demo() }) {
         this.authKeyPair = authKeyPair;
-        this.kycBaseUrl = kycBaseUrl || _kycBaseURL;
-        this.orderBaseUrl = orderBaseUrl || _orderBaseURL;
+        this.kycBaseUrl = appConfig.storageBaseUrl;
+        this.orderBaseUrl = appConfig.orderBaseUrl;
         this._authPublicKey = "";
         this._kycClient = null;
         this._orderClient = null;

@@ -1,3 +1,11 @@
+export declare class AppConfig {
+    readonly storageBaseUrl: string;
+    readonly orderBaseUrl: string;
+    private constructor();
+    static demo(): AppConfig;
+    static production(): AppConfig;
+    static custom(storageBaseUrl: string, orderBaseUrl: string): AppConfig;
+}
 export type OrderIds = {
     orderId: string;
     externalId?: "";
