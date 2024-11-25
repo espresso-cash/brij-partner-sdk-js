@@ -28,10 +28,7 @@ export class AppConfig {
   }
 
   static demo() {
-    return new AppConfig(
-      "https://kyc-backend-oxvpvdtvzq-ew.a.run.app/",
-      "https://kyc-backend-orders-402681483920.europe-west1.run.app/"
-    );
+    return new AppConfig("https://storage-demo.brij.fi/", "https://orders-demo.brij.fi/");
   }
 
   static production() {
