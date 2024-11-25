@@ -14,10 +14,10 @@ export class AppConfig {
         this.orderBaseUrl = orderBaseUrl;
     }
     static demo() {
-        return new AppConfig('https://kyc-backend-oxvpvdtvzq-ew.a.run.app/', 'https://kyc-backend-orders-402681483920.europe-west1.run.app/');
+        return new AppConfig("https://storage-demo.brij.fi/", "https://orders-demo.brij.fi/");
     }
     static production() {
-        return new AppConfig('https://storage.brij.fi/', 'https://orders.brij.fi/');
+        return new AppConfig("https://storage.brij.fi/", "https://orders.brij.fi/");
     }
     static custom(storageBaseUrl, orderBaseUrl) {
         return new AppConfig(storageBaseUrl, orderBaseUrl);
@@ -71,7 +71,7 @@ export class BrijPartnerClient {
             getPrivateKeyBytes: async () => keyPair.secretKey,
         };
     }
-    static async fromSeed(seed) {
+    static async fromSeed(seed, appConfig) {
         const decoded = base58.decode(seed);
         const authKeyPair = nacl.sign.keyPair.fromSeed(decoded);
         const client = new BrijPartnerClient({
@@ -83,6 +83,7 @@ export class BrijPartnerClient {
                     return authKeyPair.publicKey;
                 },
             },
+            appConfig,
         });
         await client.init();
         return client;
