@@ -24,6 +24,12 @@ Using the generated `seed`, initialize the client:
 const client = await BrijPartnerClient.fromSeed(seed);
 ```
 
+For production use:
+
+```Javascript
+const client = await BrijPartnerClient.fromSeed(seed, AppConfig.prod());
+```
+
 ## React to an Order
 
 Once you receive a notification from the incoming webhook, you can retrieve the `orderId` from the JSON-encoded body.

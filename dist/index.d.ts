@@ -110,7 +110,7 @@ export declare class BrijPartnerClient {
         getPublicKeyBytes: () => Promise<Uint8Array>;
         getPrivateKeyBytes: () => Promise<Uint8Array>;
     }>;
-    static fromSeed(seed: string): Promise<BrijPartnerClient>;
+    static fromSeed(seed: string, appConfig?: AppConfig): Promise<BrijPartnerClient>;
     private init;
     private generateAuthToken;
     private createToken;
