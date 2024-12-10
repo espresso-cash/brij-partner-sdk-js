@@ -46,25 +46,25 @@ export type UserDataValueField<T> = {
     value: T;
 } & UserDataField;
 export type UserData = {
-    email: Array<UserDataValueField<string>>;
-    phone: Array<UserDataValueField<string>>;
-    name: Array<{
+    email?: UserDataValueField<string>;
+    phone?: UserDataValueField<string>;
+    name?: {
         firstName: string;
         lastName: string;
-    } & UserDataField>;
-    birthDate: Array<UserDataValueField<Date>>;
-    document: Array<{
+    } & UserDataField;
+    birthDate?: UserDataValueField<Date>;
+    document?: {
         type: string;
         number: string;
         countryCode: string;
-    } & UserDataField>;
-    bankInfo: Array<{
+    } & UserDataField;
+    bankInfo?: {
         bankName: string;
         accountNumber: string;
         bankCode: string;
-    } & UserDataField>;
-    selfie: Array<UserDataValueField<Uint8Array>>;
-    custom: Record<string, string>;
+    } & UserDataField;
+    selfie?: UserDataValueField<Uint8Array>;
+    custom?: Record<string, string>;
 };
 export declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",
@@ -96,10 +96,10 @@ export type Order = {
 };
 export declare class BrijPartnerClient {
     private authKeyPair;
-    private readonly kycBaseUrl;
+    private readonly storageBaseUrl;
     private readonly orderBaseUrl;
     private _authPublicKey;
-    private _kycClient;
+    private _storageClient;
     private _orderClient;
     private constructor();
     static generateKeyPair(): Promise<{

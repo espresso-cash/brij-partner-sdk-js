@@ -1,5 +1,18 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-export declare const protobufPackage = "espressocash.data.v1";
+export declare const protobufPackage = "brij.storage.v1";
+export declare enum DataType {
+    DATA_TYPE_UNSPECIFIED = 0,
+    DATA_TYPE_PHONE = 1,
+    DATA_TYPE_EMAIL = 2,
+    DATA_TYPE_NAME = 3,
+    DATA_TYPE_BIRTH_DATE = 4,
+    DATA_TYPE_DOCUMENT = 5,
+    DATA_TYPE_BANK_INFO = 6,
+    DATA_TYPE_SELFIE_IMAGE = 7,
+    UNRECOGNIZED = -1
+}
+export declare function dataTypeFromJSON(object: any): DataType;
+export declare function dataTypeToJSON(object: DataType): string;
 export declare enum DocumentType {
     DOCUMENT_TYPE_UNSPECIFIED = 0,
     DOCUMENT_TYPE_VOTER_ID = 1,
@@ -7,27 +20,12 @@ export declare enum DocumentType {
 }
 export declare function documentTypeFromJSON(object: any): DocumentType;
 export declare function documentTypeToJSON(object: DocumentType): string;
-export declare enum ValidationStatus {
-    VALIDATION_STATUS_UNSPECIFIED = 0,
-    VALIDATION_STATUS_PENDING = 1,
-    VALIDATION_STATUS_APPROVED = 2,
-    VALIDATION_STATUS_REJECTED = 3,
-    UNRECOGNIZED = -1
-}
-export declare function validationStatusFromJSON(object: any): ValidationStatus;
-export declare function validationStatusToJSON(object: ValidationStatus): string;
-export interface WrappedData {
-    email?: string | undefined;
-    name?: Name | undefined;
-    birthDate?: Date | undefined;
-    phone?: string | undefined;
-    document?: Document | undefined;
-    bankInfo?: BankInfo | undefined;
-    selfieImage?: Uint8Array | undefined;
-}
 export interface Name {
     firstName: string;
     lastName: string;
+}
+export interface BirthDate {
+    value: Date | undefined;
 }
 export interface Document {
     type: DocumentType;
@@ -39,25 +37,22 @@ export interface BankInfo {
     bankCode: string;
     bankName: string;
 }
-export interface WrappedValidation {
-    hash?: HashValidation | undefined;
-    custom?: CustomValidation | undefined;
+export interface Email {
+    value: string;
 }
-export interface HashValidation {
-    hash: string;
-    status: ValidationStatus;
+export interface SelfieImage {
+    value: Uint8Array;
 }
-export interface CustomValidation {
-    type: string;
-    data: Uint8Array;
+export interface Phone {
+    value: string;
 }
-export declare const WrappedData: MessageFns<WrappedData>;
 export declare const Name: MessageFns<Name>;
+export declare const BirthDate: MessageFns<BirthDate>;
 export declare const Document: MessageFns<Document>;
 export declare const BankInfo: MessageFns<BankInfo>;
-export declare const WrappedValidation: MessageFns<WrappedValidation>;
-export declare const HashValidation: MessageFns<HashValidation>;
-export declare const CustomValidation: MessageFns<CustomValidation>;
+export declare const Email: MessageFns<Email>;
+export declare const SelfieImage: MessageFns<SelfieImage>;
+export declare const Phone: MessageFns<Phone>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
