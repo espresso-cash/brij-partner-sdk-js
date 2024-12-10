@@ -6,7 +6,7 @@ import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
 import { documentTypeToJSON, dataTypeFromJSON, DataType, Email, Phone, Name, BirthDate, Document, BankInfo, SelfieImage, } from "./generated/protos/data.js";
-import { ValidationStatus as ProtoValidationStatus } from "./generated/protos/validation_status.js";
+import { ValidationStatus as ProtoValidationStatus, validationStatusFromJSON } from "./generated/protos/validation_status.js";
 export class AppConfig {
     storageBaseUrl;
     orderBaseUrl;
@@ -133,7 +133,7 @@ export class BrijPartnerClient {
             {
                 dataId: data.dataId,
                 hash: data.hash,
-                status: toValidationStatus(data.status),
+                status: data.status,
             },
         ]));
         const userData = {};
@@ -145,7 +145,7 @@ export class BrijPartnerClient {
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
             const status = verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED;
-            const commonFields = { dataId, status: toValidationStatus(status) };
+            const commonFields = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
             switch (dataTypeFromJSON(encrypted.type)) {
                 case DataType.DATA_TYPE_EMAIL: {
                     const data = Email.decode(decryptedData);

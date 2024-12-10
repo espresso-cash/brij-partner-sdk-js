@@ -18,7 +18,7 @@ import {
   SelfieImage,
   MessageFns,
 } from "./generated/protos/data.js";
-import { ValidationStatus as ProtoValidationStatus } from "./generated/protos/validation_status.js";
+import { ValidationStatus as ProtoValidationStatus, validationStatusFromJSON } from "./generated/protos/validation_status.js";
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -251,7 +251,7 @@ export class BrijPartnerClient {
         {
           dataId: data.dataId,
           hash: data.hash,
-          status: toValidationStatus(data.status),
+          status: data.status,
         },
       ])
     );
@@ -267,7 +267,7 @@ export class BrijPartnerClient {
       const dataId = encrypted.id;
       const verificationData = validationMap.get(dataId);
       const status = verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED;
-      const commonFields: UserDataField = { dataId, status: toValidationStatus(status) };
+      const commonFields: UserDataField = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
 
       switch (dataTypeFromJSON(encrypted.type)) {
         case DataType.DATA_TYPE_EMAIL: {
