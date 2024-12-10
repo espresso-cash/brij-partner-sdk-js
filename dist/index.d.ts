@@ -37,6 +37,7 @@ export type RejectOrderParams = {
 export type DataAccessParams = {
     userPK: string;
     secretKey: string;
+    includeValues?: boolean;
 };
 export type UserDataField = {
     dataId: string;
@@ -114,7 +115,7 @@ export declare class BrijPartnerClient {
     private init;
     private generateAuthToken;
     private createToken;
-    getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData>;
+    getUserData({ userPK, secretKey, includeValues }: DataAccessParams): Promise<UserData>;
     private decryptOrderFields;
     private processOrder;
     getOrder({ externalId, orderId }: OrderIds): Promise<Order>;

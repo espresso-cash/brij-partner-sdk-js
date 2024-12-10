@@ -122,10 +122,10 @@ export class BrijPartnerClient {
         const signature = nacl.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
         return `${dataToSign}.${base64url.encode(signature)}`;
     }
-    async getUserData({ userPK, secretKey }) {
+    async getUserData({ userPK, secretKey, includeValues = true }) {
         const response = await this._storageClient.post("/v1/getUserData", {
             userPublicKey: userPK,
-            includeValues: false,
+            includeValues,
         });
         const responseData = response.data;
         const validationMap = new Map(responseData.validationData.map((data) => [
@@ -378,20 +378,11 @@ export class BrijPartnerClient {
         return base58.encode(decryptedSecretKey);
     }
     async decryptData(encryptedMessage, key) {
-        console.log({
-            messageLength: encryptedMessage.length,
-            nonceLength: nacl.secretbox.nonceLength,
-            keyLength: key.length,
-        });
         if (encryptedMessage.length < nacl.secretbox.nonceLength) {
             throw new Error(`Encrypted message too short: ${encryptedMessage.length} bytes`);
         }
         const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
         const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
-        console.log({
-            nonceBytes: nonce.length,
-            ciphertextBytes: ciphertext.length,
-        });
         const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
         if (!decrypted) {
             throw new Error("Unable to decrypt data");

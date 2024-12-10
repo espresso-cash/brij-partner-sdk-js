@@ -74,7 +74,11 @@ export type AcceptOffRampOrderParams = {
 
 export type RejectOrderParams = { orderId: string; reason: string };
 
-export type DataAccessParams = { userPK: string; secretKey: string };
+export type DataAccessParams = {
+  userPK: string;
+  secretKey: string;
+  includeValues?: boolean;
+};
 
 export type UserDataField = { dataId: string; status: ValidationStatus };
 
@@ -234,10 +238,10 @@ export class BrijPartnerClient {
     return `${dataToSign}.${base64url.encode(signature)}`;
   }
 
-  async getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData> {
+  async getUserData({ userPK, secretKey, includeValues = true }: DataAccessParams): Promise<UserData> {
     const response = await this._storageClient!.post("/v1/getUserData", {
       userPublicKey: userPK,
-      includeValues: true,
+      includeValues,
     });
     const responseData = response.data;
 
