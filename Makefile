@@ -4,4 +4,5 @@ generate_protos:
        --ts_proto_out=./src/generated \
        --ts_proto_opt=esModuleInterop=true \
        --ts_proto_opt=importSuffix=.js \
-       --proto_path= ./protos/data.proto
+       --proto_path= ./protos/data.proto \
+       --proto_path= ./protos/validation_status.proto

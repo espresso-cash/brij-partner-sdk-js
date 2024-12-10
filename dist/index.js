@@ -5,7 +5,8 @@ import nacl from "tweetnacl";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import { documentTypeToJSON, ValidationStatus as ProtoValidationStatus, WrappedData, WrappedValidation, } from "./generated/protos/data.js";
+import { documentTypeToJSON, dataTypeFromJSON, DataType, Email, Phone, Name, BirthDate, Document, BankInfo, SelfieImage, } from "./generated/protos/data.js";
+import { ValidationStatus as ProtoValidationStatus, validationStatusFromJSON } from "./generated/protos/validation_status.js";
 export class AppConfig {
     storageBaseUrl;
     orderBaseUrl;
@@ -47,17 +48,17 @@ function toValidationStatus(protoStatus) {
 }
 export class BrijPartnerClient {
     authKeyPair;
-    kycBaseUrl;
+    storageBaseUrl;
     orderBaseUrl;
     _authPublicKey;
-    _kycClient;
+    _storageClient;
     _orderClient;
     constructor({ authKeyPair, appConfig = AppConfig.demo() }) {
         this.authKeyPair = authKeyPair;
-        this.kycBaseUrl = appConfig.storageBaseUrl;
+        this.storageBaseUrl = appConfig.storageBaseUrl;
         this.orderBaseUrl = appConfig.orderBaseUrl;
         this._authPublicKey = "";
-        this._kycClient = null;
+        this._storageClient = null;
         this._orderClient = null;
     }
     static async generateKeyPair() {
@@ -97,10 +98,10 @@ export class BrijPartnerClient {
             this.authKeyPair.getPrivateKeyBytes(),
         ]);
         this._authPublicKey = base58.encode(publicKeyBytes);
-        const kycToken = await this.createToken(privateKeyBytes, "kyc.espressocash.com");
-        this._kycClient = axios.create({
-            baseURL: this.kycBaseUrl,
-            headers: { Authorization: `Bearer ${kycToken}` },
+        const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
+        this._storageClient = axios.create({
+            baseURL: this.storageBaseUrl,
+            headers: { Authorization: `Bearer ${storageToken}` },
         });
         const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
         this._orderClient = axios.create({
@@ -121,107 +122,89 @@ export class BrijPartnerClient {
         const signature = nacl.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
         return `${dataToSign}.${base64url.encode(signature)}`;
     }
-    async getUserData({ userPK, secretKey }) {
-        const response = await this._kycClient.post("/v1/getUserData", {
+    async getUserData({ userPK, secretKey, includeValues = true }) {
+        const response = await this._storageClient.post("/v1/getUserData", {
             userPublicKey: userPK,
+            includeValues,
         });
         const responseData = response.data;
-        const validationMap = new Map();
-        const custom = {};
-        const userVerifyKey = base58.decode(userPK);
+        const validationMap = new Map(responseData.validationData.map((data) => [
+            data.dataId,
+            {
+                dataId: data.dataId,
+                hash: data.hash,
+                status: data.status,
+            },
+        ]));
+        const userData = {};
         const secret = base58.decode(secretKey);
-        // Validation results
-        for (const encrypted of responseData.validationData) {
-            const encryptedData = encrypted.encryptedData;
-            const validatorVerifyKey = base58.decode(encrypted.validatorPublicKey);
-            const signedMessage = naclUtil.decodeBase64(encryptedData);
-            const message = nacl.sign.open(signedMessage, validatorVerifyKey);
-            if (!message) {
-                throw new Error(`Invalid signature for key`);
-            }
-            const decryptedData = await this.decryptData(message, secret);
-            const wrappedData = WrappedValidation.decode(new Uint8Array(decryptedData));
-            if (wrappedData.hash) {
-                const result = {
-                    dataId: encrypted.dataId,
-                    value: wrappedData.hash.hash,
-                    status: wrappedData.hash.status,
-                };
-                validationMap.set(result.dataId, result);
-            }
-            else if (wrappedData.custom) {
-                const result = {
-                    type: wrappedData.custom.type,
-                    value: new TextDecoder().decode(wrappedData.custom.data),
-                };
-                custom[result.type] = result.value;
-            }
-        }
-        const userData = {
-            email: [],
-            phone: [],
-            name: [],
-            birthDate: [],
-            document: [],
-            bankInfo: [],
-            selfie: [],
-            custom: custom,
-        };
-        // User data
         for (const encrypted of responseData.userData) {
-            const encryptedData = encrypted.encryptedData;
-            const signedMessage = naclUtil.decodeBase64(encryptedData);
-            const message = nacl.sign.open(signedMessage, userVerifyKey);
-            if (!message) {
-                throw new Error(`Invalid signature for key`);
-            }
-            const decryptedData = await this.decryptData(message, secret);
-            const wrappedData = WrappedData.decode(new Uint8Array(decryptedData));
+            const decryptedData = encrypted.encryptedValue?.trim()
+                ? await this.decryptData(naclUtil.decodeBase64(encrypted.encryptedValue), secret)
+                : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
-            let status = ValidationStatus.Unspecified;
-            if (verificationData) {
-                const hash = await this.generateHash(wrappedData);
-                const hashMatching = hash === verificationData.value;
-                status = hashMatching ? toValidationStatus(verificationData.status) : ValidationStatus.Unverified;
-            }
-            const commonFields = { dataId, status };
-            if (wrappedData.email) {
-                userData.email.push({ value: wrappedData.email, ...commonFields });
-            }
-            else if (wrappedData.name) {
-                userData.name.push({
-                    firstName: wrappedData.name.firstName,
-                    lastName: wrappedData.name.lastName,
-                    ...commonFields,
-                });
-            }
-            else if (wrappedData.birthDate) {
-                userData.birthDate.push({ value: new Date(wrappedData.birthDate), ...commonFields });
-            }
-            else if (wrappedData.phone) {
-                userData.phone.push({ value: wrappedData.phone, ...commonFields });
-            }
-            else if (wrappedData.document) {
-                userData.document.push({
-                    type: documentTypeToJSON(wrappedData.document.type),
-                    number: wrappedData.document.number,
-                    countryCode: wrappedData.document.countryCode,
-                    ...commonFields,
-                });
-            }
-            else if (wrappedData.bankInfo) {
-                userData.bankInfo.push({
-                    bankName: wrappedData.bankInfo.bankName,
-                    accountNumber: wrappedData.bankInfo.accountNumber,
-                    bankCode: wrappedData.bankInfo.bankCode,
-                    ...commonFields,
-                });
-            }
-            else if (wrappedData.selfieImage) {
-                userData.selfie.push({ value: wrappedData.selfieImage, ...commonFields });
+            const status = verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED;
+            const commonFields = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
+            switch (dataTypeFromJSON(encrypted.type)) {
+                case DataType.DATA_TYPE_EMAIL: {
+                    const data = Email.decode(decryptedData);
+                    userData.email = { value: data.value, ...commonFields };
+                    break;
+                }
+                case DataType.DATA_TYPE_NAME: {
+                    const data = Name.decode(decryptedData);
+                    userData.name = {
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                        ...commonFields,
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_BIRTH_DATE: {
+                    const data = BirthDate.decode(decryptedData);
+                    userData.birthDate = { value: new Date(data.value), ...commonFields };
+                    break;
+                }
+                case DataType.DATA_TYPE_PHONE: {
+                    const data = Phone.decode(decryptedData);
+                    userData.phone = { value: data.value, ...commonFields };
+                    break;
+                }
+                case DataType.DATA_TYPE_DOCUMENT: {
+                    const data = Document.decode(decryptedData);
+                    userData.document = {
+                        type: documentTypeToJSON(data.type),
+                        number: data.number,
+                        countryCode: data.countryCode,
+                        ...commonFields,
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_BANK_INFO: {
+                    const data = BankInfo.decode(decryptedData);
+                    userData.bankInfo = {
+                        bankName: data.bankName,
+                        accountNumber: data.accountNumber,
+                        bankCode: data.bankCode,
+                        ...commonFields,
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_SELFIE_IMAGE: {
+                    const data = SelfieImage.decode(decryptedData);
+                    userData.selfie = { value: data.value, ...commonFields };
+                    break;
+                }
             }
         }
+        userData.custom = Object.fromEntries(await Promise.all(responseData.customValidationData.map(async (data) => {
+            if (!data.encryptedValue) {
+                return [data.id, ""];
+            }
+            const decryptedValue = await this.decryptData(naclUtil.decodeBase64(data.encryptedValue), secret);
+            return [data.id, new TextDecoder().decode(decryptedValue)];
+        })));
         return userData;
     }
     async decryptOrderFields(order, secretKey) {
@@ -377,7 +360,7 @@ export class BrijPartnerClient {
         });
     }
     async getUserInfo(publicKey) {
-        const response = await this._kycClient.post("/v1/getInfo", {
+        const response = await this._storageClient.post("/v1/getInfo", {
             publicKey: publicKey,
         });
         return response.data;
@@ -398,6 +381,9 @@ export class BrijPartnerClient {
         return base58.encode(decryptedSecretKey);
     }
     async decryptData(encryptedMessage, key) {
+        if (encryptedMessage.length < nacl.secretbox.nonceLength) {
+            throw new Error(`Encrypted message too short: ${encryptedMessage.length} bytes`);
+        }
         const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
         const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
         const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
@@ -407,7 +393,7 @@ export class BrijPartnerClient {
         return decrypted;
     }
     async generateHash(value) {
-        const serializedData = WrappedData.encode(value).finish();
+        const serializedData = value.encode(value).finish(); //TODO double check
         return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
     }
     createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, }) {
