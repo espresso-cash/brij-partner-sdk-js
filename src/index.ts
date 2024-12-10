@@ -134,18 +134,18 @@ function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatu
 
 export class BrijPartnerClient {
   private authKeyPair: AuthKeyPair;
-  private readonly kycBaseUrl: string;
+  private readonly storageBaseUrl: string;
   private readonly orderBaseUrl: string;
   private _authPublicKey: string;
-  private _kycClient: AxiosInstance | null;
+  private _storageClient: AxiosInstance | null;
   private _orderClient: AxiosInstance | null;
 
   private constructor({ authKeyPair, appConfig = AppConfig.demo() }: BrijPartnerClientOptions) {
     this.authKeyPair = authKeyPair;
-    this.kycBaseUrl = appConfig.storageBaseUrl;
+    this.storageBaseUrl = appConfig.storageBaseUrl;
     this.orderBaseUrl = appConfig.orderBaseUrl;
     this._authPublicKey = "";
-    this._kycClient = null;
+    this._storageClient = null;
     this._orderClient = null;
   }
 
@@ -194,11 +194,11 @@ export class BrijPartnerClient {
 
     this._authPublicKey = base58.encode(publicKeyBytes);
 
-    const kycToken = await this.createToken(privateKeyBytes, "kyc.espressocash.com");
+    const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
 
-    this._kycClient = axios.create({
-      baseURL: this.kycBaseUrl,
-      headers: { Authorization: `Bearer ${kycToken}` },
+    this._storageClient = axios.create({
+      baseURL: this.storageBaseUrl,
+      headers: { Authorization: `Bearer ${storageToken}` },
     });
 
     const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
@@ -227,7 +227,7 @@ export class BrijPartnerClient {
   }
 
   async getUserData({ userPK, secretKey }: DataAccessParams): Promise<UserData> {
-    const response = await this._kycClient!.post("/v1/getUserData", {
+    const response = await this._storageClient!.post("/v1/getUserData", {
       userPublicKey: userPK,
     });
     const responseData = response.data;
@@ -533,7 +533,7 @@ export class BrijPartnerClient {
   }
 
   async getUserInfo(publicKey: string) {
-    const response = await this._kycClient!.post("/v1/getInfo", {
+    const response = await this._storageClient!.post("/v1/getInfo", {
       publicKey: publicKey,
     });
 
