@@ -199,6 +199,9 @@ export class BrijPartnerClient {
             }
         }
         userData.custom = Object.fromEntries(await Promise.all(responseData.customValidationData.map(async (data) => {
+            if (!data.encryptedValue) {
+                return [data.id, ""];
+            }
             const decryptedValue = await this.decryptData(naclUtil.decodeBase64(data.encryptedValue), secret);
             return [data.id, new TextDecoder().decode(decryptedValue)];
         })));
