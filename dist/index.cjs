@@ -1,10 +1,12 @@
-import { createHash } from 'crypto';
-import { base64url } from 'jose';
-import axios from 'axios';
-import nacl from 'tweetnacl';
-import base58 from 'bs58';
-import naclUtil from 'tweetnacl-util';
-import ed2curve from 'ed2curve';
+'use strict';
+
+var crypto = require('crypto');
+var jose = require('jose');
+var axios = require('axios');
+var nacl = require('tweetnacl');
+var base58 = require('bs58');
+var naclUtil = require('tweetnacl-util');
+var ed2curve = require('ed2curve');
 
 // Copyright 2008 Google Inc.  All rights reserved.
 //
@@ -1653,32 +1655,32 @@ function isSet(value) {
 //   protoc               v5.26.1
 // source: protos/validation_status.proto
 /* eslint-disable */
-var ValidationStatus$1;
+var ValidationStatus;
 (function (ValidationStatus) {
     ValidationStatus[ValidationStatus["VALIDATION_STATUS_UNSPECIFIED"] = 0] = "VALIDATION_STATUS_UNSPECIFIED";
     ValidationStatus[ValidationStatus["VALIDATION_STATUS_PENDING"] = 1] = "VALIDATION_STATUS_PENDING";
     ValidationStatus[ValidationStatus["VALIDATION_STATUS_APPROVED"] = 2] = "VALIDATION_STATUS_APPROVED";
     ValidationStatus[ValidationStatus["VALIDATION_STATUS_REJECTED"] = 3] = "VALIDATION_STATUS_REJECTED";
     ValidationStatus[ValidationStatus["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(ValidationStatus$1 || (ValidationStatus$1 = {}));
+})(ValidationStatus || (ValidationStatus = {}));
 function validationStatusFromJSON(object) {
     switch (object) {
         case 0:
         case "VALIDATION_STATUS_UNSPECIFIED":
-            return ValidationStatus$1.VALIDATION_STATUS_UNSPECIFIED;
+            return ValidationStatus.VALIDATION_STATUS_UNSPECIFIED;
         case 1:
         case "VALIDATION_STATUS_PENDING":
-            return ValidationStatus$1.VALIDATION_STATUS_PENDING;
+            return ValidationStatus.VALIDATION_STATUS_PENDING;
         case 2:
         case "VALIDATION_STATUS_APPROVED":
-            return ValidationStatus$1.VALIDATION_STATUS_APPROVED;
+            return ValidationStatus.VALIDATION_STATUS_APPROVED;
         case 3:
         case "VALIDATION_STATUS_REJECTED":
-            return ValidationStatus$1.VALIDATION_STATUS_REJECTED;
+            return ValidationStatus.VALIDATION_STATUS_REJECTED;
         case -1:
         case "UNRECOGNIZED":
         default:
-            return ValidationStatus$1.UNRECOGNIZED;
+            return ValidationStatus.UNRECOGNIZED;
     }
 }
 
@@ -1699,26 +1701,26 @@ class AppConfig {
         return new AppConfig(storageBaseUrl, orderBaseUrl);
     }
 }
-var ValidationStatus;
+exports.ValidationStatus = void 0;
 (function (ValidationStatus) {
     ValidationStatus["Unspecified"] = "UNSPECIFIED";
     ValidationStatus["Pending"] = "PENDING";
     ValidationStatus["Approved"] = "APPROVED";
     ValidationStatus["Rejected"] = "REJECTED";
     ValidationStatus["Unverified"] = "UNVERIFIED";
-})(ValidationStatus || (ValidationStatus = {}));
+})(exports.ValidationStatus || (exports.ValidationStatus = {}));
 function toValidationStatus(protoStatus) {
     switch (protoStatus) {
-        case ValidationStatus$1.VALIDATION_STATUS_UNSPECIFIED:
-            return ValidationStatus.Unspecified;
-        case ValidationStatus$1.VALIDATION_STATUS_PENDING:
-            return ValidationStatus.Pending;
-        case ValidationStatus$1.VALIDATION_STATUS_APPROVED:
-            return ValidationStatus.Approved;
-        case ValidationStatus$1.VALIDATION_STATUS_REJECTED:
-            return ValidationStatus.Rejected;
+        case ValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
+            return exports.ValidationStatus.Unspecified;
+        case ValidationStatus.VALIDATION_STATUS_PENDING:
+            return exports.ValidationStatus.Pending;
+        case ValidationStatus.VALIDATION_STATUS_APPROVED:
+            return exports.ValidationStatus.Approved;
+        case ValidationStatus.VALIDATION_STATUS_REJECTED:
+            return exports.ValidationStatus.Rejected;
         default:
-            return ValidationStatus.Unspecified;
+            return exports.ValidationStatus.Unspecified;
     }
 }
 class BrijPartnerClient {
@@ -1791,11 +1793,11 @@ class BrijPartnerClient {
             iat: Math.floor(Date.now() / 1000),
             aud: audience,
         };
-        const encodedHeader = base64url.encode(JSON.stringify(header));
-        const encodedPayload = base64url.encode(JSON.stringify(payload));
+        const encodedHeader = jose.base64url.encode(JSON.stringify(header));
+        const encodedPayload = jose.base64url.encode(JSON.stringify(payload));
         const dataToSign = `${encodedHeader}.${encodedPayload}`;
         const signature = nacl.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
-        return `${dataToSign}.${base64url.encode(signature)}`;
+        return `${dataToSign}.${jose.base64url.encode(signature)}`;
     }
     async getUserData({ userPK, secretKey, includeValues = true }) {
         const response = await this._storageClient.post("/v1/getUserData", {
@@ -1819,7 +1821,7 @@ class BrijPartnerClient {
                 : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
-            const status = verificationData?.status ?? ValidationStatus$1.UNRECOGNIZED;
+            const status = verificationData?.status ?? ValidationStatus.UNRECOGNIZED;
             const commonFields = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
             switch (dataTypeFromJSON(encrypted.type)) {
                 case DataType.DATA_TYPE_EMAIL: {
@@ -2069,7 +2071,7 @@ class BrijPartnerClient {
     }
     async generateHash(value) {
         const serializedData = value.encode(value).finish(); //TODO double check
-        return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
+        return crypto.createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
     }
     createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, }) {
         return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}`;
@@ -2085,5 +2087,6 @@ class BrijPartnerClient {
     }
 }
 
-export { AppConfig, BrijPartnerClient, ValidationStatus };
-//# sourceMappingURL=index.js.map
+exports.AppConfig = AppConfig;
+exports.BrijPartnerClient = BrijPartnerClient;
+//# sourceMappingURL=index.cjs.map

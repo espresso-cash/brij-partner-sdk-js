@@ -1,4 +1,4 @@
-export declare class AppConfig {
+declare class AppConfig {
     readonly storageBaseUrl: string;
     readonly orderBaseUrl: string;
     private constructor();
@@ -6,47 +6,47 @@ export declare class AppConfig {
     static production(): AppConfig;
     static custom(storageBaseUrl: string, orderBaseUrl: string): AppConfig;
 }
-export type OrderIds = {
+type OrderIds = {
     orderId: string;
     externalId?: "";
 } | {
     orderId?: "";
     externalId: string;
 };
-export type CompleteOnRampOrderParams = OrderIds & {
+type CompleteOnRampOrderParams = OrderIds & {
     transactionId: string;
 };
-export type FailOrderParams = OrderIds & {
+type FailOrderParams = OrderIds & {
     reason: string;
 };
-export type AcceptOnRampOrderParams = {
+type AcceptOnRampOrderParams = {
     orderId: string;
     bankName: string;
     bankAccount: string;
     externalId?: string;
 };
-export type AcceptOffRampOrderParams = {
+type AcceptOffRampOrderParams = {
     orderId: string;
     cryptoWalletAddress: string;
     externalId?: string;
 };
-export type RejectOrderParams = {
+type RejectOrderParams = {
     orderId: string;
     reason: string;
 };
-export type DataAccessParams = {
+type DataAccessParams = {
     userPK: string;
     secretKey: string;
     includeValues?: boolean;
 };
-export type UserDataField = {
+type UserDataField = {
     dataId: string;
     status: ValidationStatus;
 };
-export type UserDataValueField<T> = {
+type UserDataValueField<T> = {
     value: T;
 } & UserDataField;
-export type UserData = {
+type UserData = {
     email?: UserDataValueField<string>;
     phone?: UserDataValueField<string>;
     name?: {
@@ -67,14 +67,14 @@ export type UserData = {
     selfie?: UserDataValueField<Uint8Array>;
     custom?: Record<string, string>;
 };
-export declare enum ValidationStatus {
+declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",
     Pending = "PENDING",
     Approved = "APPROVED",
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
-export type Order = {
+type Order = {
     orderId: string;
     externalId?: string;
     created: string;
@@ -95,7 +95,7 @@ export type Order = {
     userSignature?: string;
     partnerSignature?: string;
 };
-export declare class BrijPartnerClient {
+declare class BrijPartnerClient {
     private authKeyPair;
     private readonly storageBaseUrl;
     private readonly orderBaseUrl;
@@ -108,8 +108,8 @@ export declare class BrijPartnerClient {
         privateKey: string;
         secretKey: string;
         seed: string;
-        getPublicKeyBytes: () => Promise<Uint8Array>;
-        getPrivateKeyBytes: () => Promise<Uint8Array>;
+        getPublicKeyBytes: () => Promise<Uint8Array<ArrayBufferLike>>;
+        getPrivateKeyBytes: () => Promise<Uint8Array<ArrayBufferLike>>;
     }>;
     static fromSeed(seed: string, appConfig?: AppConfig): Promise<BrijPartnerClient>;
     private init;
@@ -137,3 +137,5 @@ export declare class BrijPartnerClient {
     private createPartnerOnRampMessage;
     private createPartnerOffRampMessage;
 }
+
+export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type Order, type OrderIds, type RejectOrderParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
