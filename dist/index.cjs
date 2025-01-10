@@ -8,6 +8,14 @@ var base58 = require('bs58');
 var naclUtil = require('tweetnacl-util');
 var ed2curve = require('ed2curve');
 
+function _interopDefault (e) { return e && e.__esModule ? e : { default: e }; }
+
+var axios__default = /*#__PURE__*/_interopDefault(axios);
+var nacl__default = /*#__PURE__*/_interopDefault(nacl);
+var base58__default = /*#__PURE__*/_interopDefault(base58);
+var naclUtil__default = /*#__PURE__*/_interopDefault(naclUtil);
+var ed2curve__default = /*#__PURE__*/_interopDefault(ed2curve);
+
 // Copyright 2008 Google Inc.  All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -1739,19 +1747,19 @@ class BrijPartnerClient {
         this._orderClient = null;
     }
     static async generateKeyPair() {
-        const keyPair = nacl.sign.keyPair();
+        const keyPair = nacl__default.default.sign.keyPair();
         return {
-            publicKey: base58.encode(keyPair.publicKey),
-            privateKey: base58.encode(keyPair.secretKey),
-            secretKey: base58.encode(keyPair.secretKey),
-            seed: base58.encode(keyPair.secretKey.slice(0, 32)),
+            publicKey: base58__default.default.encode(keyPair.publicKey),
+            privateKey: base58__default.default.encode(keyPair.secretKey),
+            secretKey: base58__default.default.encode(keyPair.secretKey),
+            seed: base58__default.default.encode(keyPair.secretKey.slice(0, 32)),
             getPublicKeyBytes: async () => keyPair.publicKey,
             getPrivateKeyBytes: async () => keyPair.secretKey,
         };
     }
     static async fromSeed(seed, appConfig) {
-        const decoded = base58.decode(seed);
-        const authKeyPair = nacl.sign.keyPair.fromSeed(decoded);
+        const decoded = base58__default.default.decode(seed);
+        const authKeyPair = nacl__default.default.sign.keyPair.fromSeed(decoded);
         const client = new BrijPartnerClient({
             authKeyPair: {
                 async getPrivateKeyBytes() {
@@ -1774,14 +1782,14 @@ class BrijPartnerClient {
             this.authKeyPair.getPublicKeyBytes(),
             this.authKeyPair.getPrivateKeyBytes(),
         ]);
-        this._authPublicKey = base58.encode(publicKeyBytes);
+        this._authPublicKey = base58__default.default.encode(publicKeyBytes);
         const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
-        this._storageClient = axios.create({
+        this._storageClient = axios__default.default.create({
             baseURL: this.storageBaseUrl,
             headers: { Authorization: `Bearer ${storageToken}` },
         });
         const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
-        this._orderClient = axios.create({
+        this._orderClient = axios__default.default.create({
             baseURL: this.orderBaseUrl,
             headers: { Authorization: `Bearer ${orderToken}` },
         });
@@ -1796,7 +1804,7 @@ class BrijPartnerClient {
         const encodedHeader = jose.base64url.encode(JSON.stringify(header));
         const encodedPayload = jose.base64url.encode(JSON.stringify(payload));
         const dataToSign = `${encodedHeader}.${encodedPayload}`;
-        const signature = nacl.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
+        const signature = nacl__default.default.sign.detached(new TextEncoder().encode(dataToSign), privateKeyBytes);
         return `${dataToSign}.${jose.base64url.encode(signature)}`;
     }
     async getUserData({ userPK, secretKey, includeValues = true }) {
@@ -1814,10 +1822,10 @@ class BrijPartnerClient {
             },
         ]));
         const userData = {};
-        const secret = base58.decode(secretKey);
+        const secret = base58__default.default.decode(secretKey);
         for (const encrypted of responseData.userData) {
             const decryptedData = encrypted.encryptedValue?.trim()
-                ? await this.decryptData(naclUtil.decodeBase64(encrypted.encryptedValue), secret)
+                ? await this.decryptData(naclUtil__default.default.decodeBase64(encrypted.encryptedValue), secret)
                 : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
@@ -1879,7 +1887,7 @@ class BrijPartnerClient {
             if (!data.encryptedValue) {
                 return [data.id, ""];
             }
-            const decryptedValue = await this.decryptData(naclUtil.decodeBase64(data.encryptedValue), secret);
+            const decryptedValue = await this.decryptData(naclUtil__default.default.decodeBase64(data.encryptedValue), secret);
             return [data.id, new TextDecoder().decode(decryptedValue)];
         })));
         return userData;
@@ -1889,7 +1897,7 @@ class BrijPartnerClient {
             if (!field)
                 return "";
             try {
-                const encryptedData = naclUtil.decodeBase64(field);
+                const encryptedData = naclUtil__default.default.decodeBase64(field);
                 return new TextDecoder().decode(await this.decryptData(encryptedData, secretKey));
             }
             catch {
@@ -1905,7 +1913,7 @@ class BrijPartnerClient {
     async processOrder(order, secretKey) {
         const decryptedOrder = await this.decryptOrderFields(order, secretKey);
         if (order.userSignature) {
-            const userVerifyKey = base58.decode(order.userPublicKey);
+            const userVerifyKey = base58__default.default.decode(order.userPublicKey);
             const userMessage = order.type === "ON_RAMP"
                 ? this.createUserOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
@@ -1921,13 +1929,13 @@ class BrijPartnerClient {
                     bankName: decryptedOrder.bankName,
                     bankAccount: decryptedOrder.bankAccount,
                 });
-            const isValidUserSig = nacl.sign.detached.verify(new TextEncoder().encode(userMessage), base58.decode(order.userSignature), userVerifyKey);
+            const isValidUserSig = nacl__default.default.sign.detached.verify(new TextEncoder().encode(userMessage), base58__default.default.decode(order.userSignature), userVerifyKey);
             if (!isValidUserSig) {
                 throw new Error("Invalid user signature");
             }
         }
         if (order.partnerSignature) {
-            const partnerVerifyKey = base58.decode(order.partnerPublicKey);
+            const partnerVerifyKey = base58__default.default.decode(order.partnerPublicKey);
             const partnerMessage = order.type === "ON_RAMP"
                 ? this.createPartnerOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
@@ -1944,7 +1952,7 @@ class BrijPartnerClient {
                     fiatCurrency: order.fiatCurrency,
                     cryptoWalletAddress: order.cryptoWalletAddress,
                 });
-            const isValidPartnerSig = nacl.sign.detached.verify(new TextEncoder().encode(partnerMessage), base58.decode(order.partnerSignature), partnerVerifyKey);
+            const isValidPartnerSig = nacl__default.default.sign.detached.verify(new TextEncoder().encode(partnerMessage), base58__default.default.decode(order.partnerSignature), partnerVerifyKey);
             if (!isValidPartnerSig) {
                 throw new Error("Invalid partner signature");
             }
@@ -1957,22 +1965,22 @@ class BrijPartnerClient {
             externalId,
         });
         const secretKey = await this.getUserSecretKey(response.data.userPublicKey);
-        return this.processOrder(response.data, base58.decode(secretKey));
+        return this.processOrder(response.data, base58__default.default.decode(secretKey));
     }
     async getPartnerOrders() {
         const response = await this._orderClient.post("/v1/getPartnerOrders");
         return Promise.all(response.data.orders.map(async (order) => {
             const secretKey = await this.getUserSecretKey(order.userPublicKey);
-            return this.processOrder(order, base58.decode(secretKey));
+            return this.processOrder(order, base58__default.default.decode(secretKey));
         }));
     }
     async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }) {
-        const key = base58.decode(userSecretKey);
+        const key = base58__default.default.decode(userSecretKey);
         const order = await this.getOrder({ orderId });
         const encryptField = (value) => {
-            const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-            const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(value), nonce, key);
-            return naclUtil.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
+            const nonce = nacl__default.default.randomBytes(nacl__default.default.secretbox.nonceLength);
+            const ciphertext = nacl__default.default.secretbox(naclUtil__default.default.decodeUTF8(value), nonce, key);
+            return naclUtil__default.default.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
         };
         const signatureMessage = this.createPartnerOnRampMessage({
             cryptoAmount: order.cryptoAmount,
@@ -1983,13 +1991,13 @@ class BrijPartnerClient {
             bankAccount,
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-        const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+        const signature = nacl__default.default.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
         await this._orderClient.post("/v1/acceptOrder", {
             orderId,
             bankName: encryptField(bankName),
             bankAccount: encryptField(bankAccount),
             externalId,
-            partnerSignature: base58.encode(signature),
+            partnerSignature: base58__default.default.encode(signature),
         });
     }
     async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
@@ -2002,12 +2010,12 @@ class BrijPartnerClient {
             cryptoWalletAddress,
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-        const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+        const signature = nacl__default.default.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
         await this._orderClient.post("/v1/acceptOrder", {
             orderId,
             cryptoWalletAddress,
             externalId,
-            partnerSignature: base58.encode(signature),
+            partnerSignature: base58__default.default.encode(signature),
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
@@ -2044,26 +2052,26 @@ class BrijPartnerClient {
     }
     async getUserSecretKey(publicKey) {
         const info = await this.getUserInfo(publicKey);
-        const encryptedData = naclUtil.decodeBase64(info.encryptedSecretKey);
+        const encryptedData = naclUtil__default.default.decodeBase64(info.encryptedSecretKey);
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-        const x25519PrivateKey = ed2curve.convertSecretKey(privateKeyBytes);
-        const userPk = base58.decode(publicKey);
-        const x25519PublicKey = ed2curve.convertPublicKey(userPk);
-        const nonce = encryptedData.slice(0, nacl.box.nonceLength);
-        const ciphertext = encryptedData.slice(nacl.box.nonceLength);
-        const decryptedSecretKey = nacl.box.open(ciphertext, nonce, x25519PublicKey, x25519PrivateKey);
+        const x25519PrivateKey = ed2curve__default.default.convertSecretKey(privateKeyBytes);
+        const userPk = base58__default.default.decode(publicKey);
+        const x25519PublicKey = ed2curve__default.default.convertPublicKey(userPk);
+        const nonce = encryptedData.slice(0, nacl__default.default.box.nonceLength);
+        const ciphertext = encryptedData.slice(nacl__default.default.box.nonceLength);
+        const decryptedSecretKey = nacl__default.default.box.open(ciphertext, nonce, x25519PublicKey, x25519PrivateKey);
         if (!decryptedSecretKey) {
             throw new Error("Decryption failed");
         }
-        return base58.encode(decryptedSecretKey);
+        return base58__default.default.encode(decryptedSecretKey);
     }
     async decryptData(encryptedMessage, key) {
-        if (encryptedMessage.length < nacl.secretbox.nonceLength) {
+        if (encryptedMessage.length < nacl__default.default.secretbox.nonceLength) {
             throw new Error(`Encrypted message too short: ${encryptedMessage.length} bytes`);
         }
-        const nonce = encryptedMessage.slice(0, nacl.secretbox.nonceLength);
-        const ciphertext = encryptedMessage.slice(nacl.secretbox.nonceLength);
-        const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
+        const nonce = encryptedMessage.slice(0, nacl__default.default.secretbox.nonceLength);
+        const ciphertext = encryptedMessage.slice(nacl__default.default.secretbox.nonceLength);
+        const decrypted = nacl__default.default.secretbox.open(ciphertext, nonce, key);
         if (!decrypted) {
             throw new Error("Unable to decrypt data");
         }

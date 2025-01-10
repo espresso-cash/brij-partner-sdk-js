@@ -16,7 +16,9 @@ export default [
     },
     external,
     plugins: [
-      resolve(),
+      resolve({
+        preferBuiltins: true,
+      }),
       commonjs(),
       typescript({
         tsconfig: "./tsconfig.json",
@@ -32,11 +34,18 @@ export default [
       file: "dist/index.cjs",
       format: "cjs",
       sourcemap: true,
+      exports: "named",
+      interop: "auto",
     },
     external,
     plugins: [
-      resolve(),
-      commonjs(),
+      resolve({
+        preferBuiltins: true,
+      }),
+      commonjs({
+        transformMixedEsModules: true,
+        requireReturnsDefault: "auto",
+      }),
       typescript({
         tsconfig: "./tsconfig.json",
         declaration: false,
