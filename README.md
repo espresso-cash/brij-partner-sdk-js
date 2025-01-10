@@ -3,7 +3,7 @@
 ## Install SDK
 
 ```
-npm install https://github.com/espresso-cash/brij-partner-sdk-js
+npm install brij-partner-sdk
 ```
 
 ## Register your Partner's Public Key
