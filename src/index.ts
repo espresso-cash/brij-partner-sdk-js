@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import { base64url } from "jose";
 import axios, { AxiosInstance } from "axios";
 import nacl from "tweetnacl";
@@ -6,19 +5,21 @@ import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
 import {
-  documentTypeToJSON,
-  dataTypeFromJSON,
-  DataType,
-  Email,
-  Phone,
-  Name,
-  BirthDate,
-  Document,
   BankInfo,
+  BirthDate,
+  DataType,
+  dataTypeFromJSON,
+  Document,
+  documentTypeToJSON,
+  Email,
+  Name,
+  Phone,
   SelfieImage,
-  MessageFns,
 } from "./generated/protos/data.js";
-import { ValidationStatus as ProtoValidationStatus, validationStatusFromJSON } from "./generated/protos/validation_status.js";
+import {
+  ValidationStatus as ProtoValidationStatus,
+  validationStatusFromJSON,
+} from "./generated/protos/validation_status.js";
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -96,8 +97,6 @@ export type UserData = {
 };
 
 type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
-
-type CustomValidationResult = { type: string; value: string };
 
 export enum ValidationStatus {
   Unspecified = "UNSPECIFIED",
