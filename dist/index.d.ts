@@ -83,9 +83,9 @@ type Order = {
     userPublicKey: string;
     comment: string;
     type: "ON_RAMP" | "OFF_RAMP";
-    cryptoAmount: string;
+    cryptoAmount: number;
     cryptoCurrency: string;
-    fiatAmount: string;
+    fiatAmount: number;
     fiatCurrency: string;
     bankName: string;
     bankAccount: string;
@@ -131,7 +131,6 @@ declare class BrijPartnerClient {
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
     private decryptData;
-    private generateHash;
     private createUserOnRampMessage;
     private createUserOffRampMessage;
     private createPartnerOnRampMessage;
