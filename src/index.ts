@@ -116,9 +116,9 @@ export type Order = {
   userPublicKey: string;
   comment: string;
   type: "ON_RAMP" | "OFF_RAMP";
-  cryptoAmount: string;
+  cryptoAmount: number;
   cryptoCurrency: string;
-  fiatAmount: string;
+  fiatAmount: number;
   fiatCurrency: string;
   bankName: string;
   bankAccount: string;
@@ -578,10 +578,6 @@ export class BrijPartnerClient {
 
     return decrypted;
   }
-  private async generateHash(value: MessageFns<any>): Promise<string> {
-    const serializedData = value.encode(value).finish(); //TODO double check
-    return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
-  }
 
   private createUserOnRampMessage({
     cryptoAmount,
@@ -589,9 +585,9 @@ export class BrijPartnerClient {
     fiatAmount,
     fiatCurrency,
   }: {
-    cryptoAmount: string;
+    cryptoAmount: number;
     cryptoCurrency: string;
-    fiatAmount: string;
+    fiatAmount: number;
     fiatCurrency: string;
   }): string {
     return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}`;
@@ -605,9 +601,9 @@ export class BrijPartnerClient {
     bankName,
     bankAccount,
   }: {
-    cryptoAmount: string;
+    cryptoAmount: number;
     cryptoCurrency: string;
-    fiatAmount: string;
+    fiatAmount: number;
     fiatCurrency: string;
     bankName: string;
     bankAccount: string;
@@ -623,9 +619,9 @@ export class BrijPartnerClient {
     bankName,
     bankAccount,
   }: {
-    cryptoAmount: string;
+    cryptoAmount: number;
     cryptoCurrency: string;
-    fiatAmount: string;
+    fiatAmount: number;
     fiatCurrency: string;
     bankName: string;
     bankAccount: string;
@@ -640,9 +636,9 @@ export class BrijPartnerClient {
     fiatCurrency,
     cryptoWalletAddress,
   }: {
-    cryptoAmount: string;
+    cryptoAmount: number;
     cryptoCurrency: string;
-    fiatAmount: string;
+    fiatAmount: number;
     fiatCurrency: string;
     cryptoWalletAddress: string;
   }): string {

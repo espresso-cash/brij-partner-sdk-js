@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { base64url } from 'jose';
 import axios from 'axios';
 import nacl from 'tweetnacl';
@@ -2066,10 +2065,6 @@ class BrijPartnerClient {
             throw new Error("Unable to decrypt data");
         }
         return decrypted;
-    }
-    async generateHash(value) {
-        const serializedData = value.encode(value).finish(); //TODO double check
-        return createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
     }
     createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, }) {
         return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}`;

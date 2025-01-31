@@ -1,6 +1,5 @@
 'use strict';
 
-var crypto = require('crypto');
 var jose = require('jose');
 var axios = require('axios');
 var nacl = require('tweetnacl');
@@ -2076,10 +2075,6 @@ class BrijPartnerClient {
             throw new Error("Unable to decrypt data");
         }
         return decrypted;
-    }
-    async generateHash(value) {
-        const serializedData = value.encode(value).finish(); //TODO double check
-        return crypto.createHash("sha256").update(Buffer.from(serializedData)).digest("hex");
     }
     createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, }) {
         return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}`;
