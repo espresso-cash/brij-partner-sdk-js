@@ -578,6 +578,25 @@ export class BrijPartnerClient {
     return decrypted;
   }
 
+  private static readonly currencyDecimals: Record<string, number> = {
+    // Crypto currencies
+    USDC: 6,
+    SOL: 9,
+    // Fiat currencies
+    USD: 2,
+    NGN: 2,
+  };
+
+  private convertToDecimalPrecision(amount: number, currency: string): string {
+    const decimals = BrijPartnerClient.currencyDecimals[currency];
+    
+    if (decimals === undefined) {
+      throw new Error(`Unknown currency: ${currency}`);
+    }
+
+    return Math.round(amount * Math.pow(10, decimals)).toString();
+  }
+
   private createUserOnRampMessage({
     cryptoAmount,
     cryptoCurrency,
@@ -589,7 +608,9 @@ export class BrijPartnerClient {
     fiatAmount: number;
     fiatCurrency: string;
   }): string {
-    return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}`;
+    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}`;
   }
 
   private createUserOffRampMessage({
@@ -607,7 +628,9 @@ export class BrijPartnerClient {
     bankName: string;
     bankAccount: string;
   }): string {
-    return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
+    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
   }
 
   private createPartnerOnRampMessage({
@@ -625,7 +648,9 @@ export class BrijPartnerClient {
     bankName: string;
     bankAccount: string;
   }): string {
-    return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
+    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
   }
 
   private createPartnerOffRampMessage({
@@ -641,6 +666,8 @@ export class BrijPartnerClient {
     fiatCurrency: string;
     cryptoWalletAddress: string;
   }): string {
-    return `${cryptoAmount}|${cryptoCurrency}|${fiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
+    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 }

@@ -131,6 +131,8 @@ declare class BrijPartnerClient {
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
     private decryptData;
+    private static readonly currencyDecimals;
+    private convertToDecimalPrecision;
     private createUserOnRampMessage;
     private createUserOffRampMessage;
     private createPartnerOnRampMessage;
