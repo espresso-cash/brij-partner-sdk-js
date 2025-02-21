@@ -54,16 +54,16 @@ type UserData = {
         lastName: string;
     } & UserDataField;
     birthDate?: UserDataValueField<Date>;
-    document?: {
+    document?: ({
         type: string;
         number: string;
         countryCode: string;
-    } & UserDataField;
-    bankInfo?: {
+    } & UserDataField)[];
+    bankInfo?: ({
         bankName: string;
         accountNumber: string;
         bankCode: string;
-    } & UserDataField;
+    } & UserDataField)[];
     selfie?: UserDataValueField<Uint8Array>;
     custom?: Record<string, string>;
 };
