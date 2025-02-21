@@ -336,7 +336,6 @@ export class BrijPartnerClient {
       )
     );
 
-    // Only add arrays if they contain items
     if (documentList.length > 0) {
       userData.document = documentList;
     }
