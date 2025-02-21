@@ -93,35 +93,27 @@ You will receive the following structure, where you can see data and verificatio
 
 ```json
 {
-  "email": [
-    {
+  "email": {
       "value": "test@gmail.com",
       "dataId": "2bf9ad39-b213-4b77-b077-872e93301814",
       "status": "APPROVED"
-    }
-  ],
-  "phone": [
-    {
+    },
+  "phone": {
       "value": "+12345678",
       "dataId": "6d01814f-431d-4ca6-a4c3-c76ef7fc7343",
       "status": "UNSPECIFIED"
-    }
-  ],
-  "name": [
-    {
+    },
+  "name": {
       "firstName": "John",
       "lastName": "Doe",
       "dataId": "2a1b66b2-7bef-4b04-8f13-e7baed9e06eb",
       "status": "UNSPECIFIED"
-    }
-  ],
-  "birthDate": [
-    {
+    },
+  "birthDate": {
       "value": "2000-03-29T21:00:00.000Z",
       "dataId": "372b9e44-300c-443a-882b-af8cd7ff53d9",
       "status": "UNSPECIFIED"
-    }
-  ],
+    },
   "document": [
     {
       "type": "DOCUMENT_TYPE_VOTER_ID",
@@ -140,8 +132,7 @@ You will receive the following structure, where you can see data and verificatio
       "status": "UNSPECIFIED"
     }
   ],
-  "selfie": [
-    {
+  "selfie": {
       "value": {
         "1": 60,
         "2": 115,
@@ -153,8 +144,7 @@ You will receive the following structure, where you can see data and verificatio
       },
       "dataId": "372b9e44-300c-443a-882b-a3234142429",
       "status": "UNSPECIFIED"
-    }
-  ],
+  },
   "custom": {
     "kyc": "\"result\""
   }
