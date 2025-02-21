@@ -2009,7 +2009,6 @@ class BrijPartnerClient {
             const decryptedValue = await this.decryptData(naclUtil__default.default.decodeBase64(data.encryptedValue), secret);
             return [data.id, new TextDecoder().decode(decryptedValue)];
         })));
-        // Only add arrays if they contain items
         if (documentList.length > 0) {
             userData.document = documentList;
         }
