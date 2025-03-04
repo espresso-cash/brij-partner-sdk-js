@@ -1,10 +1,11 @@
 declare class AppConfig {
     readonly storageBaseUrl: string;
     readonly orderBaseUrl: string;
+    readonly verifierAuthPk: string;
     private constructor();
     static demo(): AppConfig;
     static production(): AppConfig;
-    static custom(storageBaseUrl: string, orderBaseUrl: string): AppConfig;
+    static custom(storageBaseUrl: string, orderBaseUrl: string, verifierAuthPk: string): AppConfig;
 }
 type OrderIds = {
     orderId: string;
@@ -95,6 +96,25 @@ type Order = {
     userSignature?: string;
     partnerSignature?: string;
 };
+declare enum KycStatus {
+    Unspecified = "KYC_STATUS_UNSPECIFIED",
+    Pending = "KYC_STATUS_PENDING",
+    Approved = "KYC_STATUS_APPROVED",
+    Rejected = "KYC_STATUS_REJECTED"
+}
+interface KycItem {
+    country: string;
+    status: KycStatus;
+    provider: string;
+    userPublicKey: string;
+    hashes: string[];
+    additionalData: Record<string, any>;
+}
+interface KycStatusDetails {
+    status: KycStatus;
+    data?: KycItem;
+    signature?: string;
+}
 declare class BrijPartnerClient {
     private authKeyPair;
     private readonly storageBaseUrl;
@@ -102,6 +122,7 @@ declare class BrijPartnerClient {
     private _authPublicKey;
     private _storageClient;
     private _orderClient;
+    private readonly _verifierAuthPk;
     private constructor();
     static generateKeyPair(): Promise<{
         publicKey: string;
@@ -130,6 +151,10 @@ declare class BrijPartnerClient {
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
+    getKycStatusDetails(params: {
+        userPK: string;
+        country: string;
+    }): Promise<KycStatusDetails>;
     private decryptData;
     private static readonly currencyDecimals;
     private convertToDecimalPrecision;
@@ -139,4 +164,4 @@ declare class BrijPartnerClient {
     private createPartnerOffRampMessage;
 }
 
-export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type Order, type OrderIds, type RejectOrderParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
+export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, type RejectOrderParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
