@@ -1684,18 +1684,20 @@ function validationStatusFromJSON(object) {
 class AppConfig {
     storageBaseUrl;
     orderBaseUrl;
-    constructor(storageBaseUrl, orderBaseUrl) {
+    verifierAuthPk;
+    constructor(storageBaseUrl, orderBaseUrl, verifierAuthPk) {
         this.storageBaseUrl = storageBaseUrl;
         this.orderBaseUrl = orderBaseUrl;
+        this.verifierAuthPk = verifierAuthPk;
     }
     static demo() {
-        return new AppConfig("https://storage-demo.brij.fi/", "https://orders-demo.brij.fi/");
+        return new AppConfig("https://storage-demo.brij.fi/", "https://orders-demo.brij.fi/", "HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E");
     }
     static production() {
-        return new AppConfig("https://storage.brij.fi/", "https://orders.brij.fi/");
+        return new AppConfig("https://storage.brij.fi/", "https://orders.brij.fi/", "88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ");
     }
-    static custom(storageBaseUrl, orderBaseUrl) {
-        return new AppConfig(storageBaseUrl, orderBaseUrl);
+    static custom(storageBaseUrl, orderBaseUrl, verifierAuthPk) {
+        return new AppConfig(storageBaseUrl, orderBaseUrl, verifierAuthPk);
     }
 }
 var ValidationStatus;
@@ -1720,6 +1722,13 @@ function toValidationStatus(protoStatus) {
             return ValidationStatus.Unspecified;
     }
 }
+var KycStatus;
+(function (KycStatus) {
+    KycStatus["Unspecified"] = "KYC_STATUS_UNSPECIFIED";
+    KycStatus["Pending"] = "KYC_STATUS_PENDING";
+    KycStatus["Approved"] = "KYC_STATUS_APPROVED";
+    KycStatus["Rejected"] = "KYC_STATUS_REJECTED";
+})(KycStatus || (KycStatus = {}));
 class BrijPartnerClient {
     authKeyPair;
     storageBaseUrl;
@@ -1727,10 +1736,12 @@ class BrijPartnerClient {
     _authPublicKey;
     _storageClient;
     _orderClient;
+    _verifierAuthPk;
     constructor({ authKeyPair, appConfig = AppConfig.demo() }) {
         this.authKeyPair = authKeyPair;
         this.storageBaseUrl = appConfig.storageBaseUrl;
         this.orderBaseUrl = appConfig.orderBaseUrl;
+        this._verifierAuthPk = appConfig.verifierAuthPk;
         this._authPublicKey = "";
         this._storageClient = null;
         this._orderClient = null;
@@ -2054,6 +2065,25 @@ class BrijPartnerClient {
         }
         return base58.encode(decryptedSecretKey);
     }
+    async getKycStatusDetails(params) {
+        const response = await this._storageClient.post("/v1/getKycStatus", {
+            userPublicKey: params.userPK,
+            country: params.country,
+            validatorPublicKey: this._verifierAuthPk,
+        });
+        return {
+            status: response.data.status,
+            data: response.data.data ? {
+                country: response.data.data.country,
+                status: response.data.data.status,
+                provider: response.data.data.provider,
+                userPublicKey: response.data.data.userPublicKey,
+                hashes: response.data.data.hashes || [],
+                additionalData: response.data.data.additionalData || {},
+            } : undefined,
+            signature: response.data.signature,
+        };
+    }
     async decryptData(encryptedMessage, key) {
         if (encryptedMessage.length < nacl.secretbox.nonceLength) {
             throw new Error(`Encrypted message too short: ${encryptedMessage.length} bytes`);
@@ -2103,5 +2133,5 @@ class BrijPartnerClient {
     }
 }
 
-export { AppConfig, BrijPartnerClient, ValidationStatus };
+export { AppConfig, BrijPartnerClient, KycStatus, ValidationStatus };
 //# sourceMappingURL=index.js.map
