@@ -171,6 +171,45 @@ You will receive the following structure, where you can see data and verificatio
 >   - `UNVERIFIED`: The information has not been verified.
 > - The `custom` field contains verification results from external sources like SmileID or other KYC providers.
 
+### Getting KYC Status Details
+
+You can check a user's KYC status for a specific country using the following method:
+
+```Javascript
+const kycDetails = await client.getKycStatusDetails({
+    userPK: order.userPublicKey,
+    country: "NG"
+});
+console.log(kycDetails);
+```
+
+The response will have the following structure:
+
+```json
+{
+  "status": "KYC_STATUS_APPROVED",
+  "data": {
+    "country": "NG",
+    "status": "KYC_STATUS_APPROVED",
+    "provider": "smileid",
+    "userPublicKey": "36qQQywHacgoTaK744BL5L5i2budJRTbed2iXGcNWy46",
+    "hashes": ["hash1", "hash2"],
+    "additionalData": {}
+  },
+  "signature": "signature_string"
+}
+```
+
+The status can be one of the following values:
+- `KYC_STATUS_UNSPECIFIED`: Default state
+- `KYC_STATUS_PENDING`: KYC verification is in progress
+- `KYC_STATUS_APPROVED`: KYC has been approved
+- `KYC_STATUS_REJECTED`: KYC has been rejected
+
+> [!NOTE]
+> The `additionalData` field contains the raw verification results from the KYC provider (e.g., SmileID). This data can be used for detailed verification analysis.
+
+
 ### Accepting and Completing the On-Ramp Order
 
 If, based on the user and order information, you’re ready to proceed with the order, you should accept it and specify the bank name, bank account information. You can also pass your internal order ID in the parameter as a reference:
