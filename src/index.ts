@@ -20,6 +20,11 @@ import {
   ValidationStatus as ProtoValidationStatus,
   validationStatusFromJSON,
 } from "./generated/protos/validation_status.js";
+import {
+  KycItem as KycItemProto,
+  KycStatus as KycStatusProto,
+} from "./generated/protos/kyc_item.js";
+
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -603,16 +608,27 @@ export class BrijPartnerClient {
       validatorPublicKey: this._verifierAuthPk,
     });
   
+    const buffer = response.data.data;
+    const uint8Array = naclUtil.decodeBase64(buffer);
+    const decoded = KycItemProto.decode(uint8Array);
+  
+    const kycItem: KycItem = {
+      country: decoded.country,
+      status: toKycStatus(decoded.status),
+      provider: decoded.provider,
+      userPublicKey: decoded.userPublicKey,
+      hashes: decoded.hashes,
+      additionalData: Object.fromEntries(
+        Object.entries(decoded.additionalData).map(([key, value]) => [
+          key,
+          new TextDecoder().decode(value)
+        ])
+      )
+    };
+  
     return {
       status: response.data.status,
-      data: response.data.data ? {
-        country: response.data.data.country,
-        status: response.data.data.status,
-        provider: response.data.data.provider,
-        userPublicKey: response.data.data.userPublicKey,
-        hashes: response.data.data.hashes || [],
-        additionalData: response.data.data.additionalData || {},
-      } : undefined,
+      data: kycItem,
       signature: response.data.signature,
     };
   }
@@ -726,3 +742,18 @@ export class BrijPartnerClient {
     return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 }
+
+function toKycStatus(protoStatus: number): KycStatus {
+    switch (protoStatus) {
+      case KycStatusProto.KYC_STATUS_UNSPECIFIED:
+        return KycStatus.Unspecified;
+      case KycStatusProto.KYC_STATUS_PENDING:
+        return KycStatus.Pending;
+      case KycStatusProto.KYC_STATUS_APPROVED:
+        return KycStatus.Approved;
+      case KycStatusProto.KYC_STATUS_REJECTED:
+        return KycStatus.Rejected;
+      default:
+        return KycStatus.Unspecified;
+    }
+  }
