@@ -19,6 +19,7 @@ export enum DataType {
   DATA_TYPE_DOCUMENT = 5,
   DATA_TYPE_BANK_INFO = 6,
   DATA_TYPE_SELFIE_IMAGE = 7,
+  DATA_TYPE_CITIZENSHIP = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -48,6 +49,9 @@ export function dataTypeFromJSON(object: any): DataType {
     case 7:
     case "DATA_TYPE_SELFIE_IMAGE":
       return DataType.DATA_TYPE_SELFIE_IMAGE;
+    case 8:
+    case "DATA_TYPE_CITIZENSHIP":
+      return DataType.DATA_TYPE_CITIZENSHIP;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -73,6 +77,8 @@ export function dataTypeToJSON(object: DataType): string {
       return "DATA_TYPE_BANK_INFO";
     case DataType.DATA_TYPE_SELFIE_IMAGE:
       return "DATA_TYPE_SELFIE_IMAGE";
+    case DataType.DATA_TYPE_CITIZENSHIP:
+      return "DATA_TYPE_CITIZENSHIP";
     case DataType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -143,6 +149,7 @@ export interface Document {
   type: DocumentType;
   number: string;
   countryCode: string;
+  expirationDate?: Date | undefined;
   photo?: DocumentPhoto | undefined;
 }
 
@@ -167,6 +174,10 @@ export interface SelfieImage {
 }
 
 export interface Phone {
+  value: string;
+}
+
+export interface Citizenship {
   value: string;
 }
 
@@ -305,7 +316,7 @@ export const BirthDate: MessageFns<BirthDate> = {
 };
 
 function createBaseDocument(): Document {
-  return { type: 0, number: "", countryCode: "", photo: undefined };
+  return { type: 0, number: "", countryCode: "", expirationDate: undefined, photo: undefined };
 }
 
 export const Document: MessageFns<Document> = {
@@ -319,8 +330,11 @@ export const Document: MessageFns<Document> = {
     if (message.countryCode !== "") {
       writer.uint32(26).string(message.countryCode);
     }
+    if (message.expirationDate !== undefined) {
+      Timestamp.encode(toTimestamp(message.expirationDate), writer.uint32(34).fork()).join();
+    }
     if (message.photo !== undefined) {
-      DocumentPhoto.encode(message.photo, writer.uint32(34).fork()).join();
+      DocumentPhoto.encode(message.photo, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -361,6 +375,14 @@ export const Document: MessageFns<Document> = {
             break;
           }
 
+          message.expirationDate = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
           message.photo = DocumentPhoto.decode(reader, reader.uint32());
           continue;
         }
@@ -378,6 +400,7 @@ export const Document: MessageFns<Document> = {
       type: isSet(object.type) ? documentTypeFromJSON(object.type) : 0,
       number: isSet(object.number) ? globalThis.String(object.number) : "",
       countryCode: isSet(object.countryCode) ? globalThis.String(object.countryCode) : "",
+      expirationDate: isSet(object.expirationDate) ? fromJsonTimestamp(object.expirationDate) : undefined,
       photo: isSet(object.photo) ? DocumentPhoto.fromJSON(object.photo) : undefined,
     };
   },
@@ -393,6 +416,9 @@ export const Document: MessageFns<Document> = {
     if (message.countryCode !== "") {
       obj.countryCode = message.countryCode;
     }
+    if (message.expirationDate !== undefined) {
+      obj.expirationDate = message.expirationDate.toISOString();
+    }
     if (message.photo !== undefined) {
       obj.photo = DocumentPhoto.toJSON(message.photo);
     }
@@ -407,6 +433,7 @@ export const Document: MessageFns<Document> = {
     message.type = object.type ?? 0;
     message.number = object.number ?? "";
     message.countryCode = object.countryCode ?? "";
+    message.expirationDate = object.expirationDate ?? undefined;
     message.photo = (object.photo !== undefined && object.photo !== null)
       ? DocumentPhoto.fromPartial(object.photo)
       : undefined;
@@ -767,6 +794,64 @@ export const Phone: MessageFns<Phone> = {
   },
   fromPartial<I extends Exact<DeepPartial<Phone>, I>>(object: I): Phone {
     const message = createBasePhone();
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseCitizenship(): Citizenship {
+  return { value: "" };
+}
+
+export const Citizenship: MessageFns<Citizenship> = {
+  encode(message: Citizenship, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.value !== "") {
+      writer.uint32(10).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Citizenship {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCitizenship();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Citizenship {
+    return { value: isSet(object.value) ? globalThis.String(object.value) : "" };
+  },
+
+  toJSON(message: Citizenship): unknown {
+    const obj: any = {};
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<Citizenship>, I>>(base?: I): Citizenship {
+    return Citizenship.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<Citizenship>, I>>(object: I): Citizenship {
+    const message = createBaseCitizenship();
     message.value = object.value ?? "";
     return message;
   },

@@ -1103,6 +1103,7 @@ var DataType;
     DataType[DataType["DATA_TYPE_DOCUMENT"] = 5] = "DATA_TYPE_DOCUMENT";
     DataType[DataType["DATA_TYPE_BANK_INFO"] = 6] = "DATA_TYPE_BANK_INFO";
     DataType[DataType["DATA_TYPE_SELFIE_IMAGE"] = 7] = "DATA_TYPE_SELFIE_IMAGE";
+    DataType[DataType["DATA_TYPE_CITIZENSHIP"] = 8] = "DATA_TYPE_CITIZENSHIP";
     DataType[DataType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(DataType || (DataType = {}));
 function dataTypeFromJSON(object) {
@@ -1131,6 +1132,9 @@ function dataTypeFromJSON(object) {
         case 7:
         case "DATA_TYPE_SELFIE_IMAGE":
             return DataType.DATA_TYPE_SELFIE_IMAGE;
+        case 8:
+        case "DATA_TYPE_CITIZENSHIP":
+            return DataType.DATA_TYPE_CITIZENSHIP;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -1306,7 +1310,7 @@ const BirthDate = {
     },
 };
 function createBaseDocument() {
-    return { type: 0, number: "", countryCode: "", photo: undefined };
+    return { type: 0, number: "", countryCode: "", expirationDate: undefined, photo: undefined };
 }
 const Document = {
     encode(message, writer = new BinaryWriter()) {
@@ -1319,8 +1323,11 @@ const Document = {
         if (message.countryCode !== "") {
             writer.uint32(26).string(message.countryCode);
         }
+        if (message.expirationDate !== undefined) {
+            Timestamp.encode(toTimestamp(message.expirationDate), writer.uint32(34).fork()).join();
+        }
         if (message.photo !== undefined) {
-            DocumentPhoto.encode(message.photo, writer.uint32(34).fork()).join();
+            DocumentPhoto.encode(message.photo, writer.uint32(42).fork()).join();
         }
         return writer;
     },
@@ -1356,6 +1363,13 @@ const Document = {
                     if (tag !== 34) {
                         break;
                     }
+                    message.expirationDate = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
                     message.photo = DocumentPhoto.decode(reader, reader.uint32());
                     continue;
                 }
@@ -1372,6 +1386,7 @@ const Document = {
             type: isSet$1(object.type) ? documentTypeFromJSON(object.type) : 0,
             number: isSet$1(object.number) ? globalThis.String(object.number) : "",
             countryCode: isSet$1(object.countryCode) ? globalThis.String(object.countryCode) : "",
+            expirationDate: isSet$1(object.expirationDate) ? fromJsonTimestamp(object.expirationDate) : undefined,
             photo: isSet$1(object.photo) ? DocumentPhoto.fromJSON(object.photo) : undefined,
         };
     },
@@ -1386,6 +1401,9 @@ const Document = {
         if (message.countryCode !== "") {
             obj.countryCode = message.countryCode;
         }
+        if (message.expirationDate !== undefined) {
+            obj.expirationDate = message.expirationDate.toISOString();
+        }
         if (message.photo !== undefined) {
             obj.photo = DocumentPhoto.toJSON(message.photo);
         }
@@ -1399,6 +1417,7 @@ const Document = {
         message.type = object.type ?? 0;
         message.number = object.number ?? "";
         message.countryCode = object.countryCode ?? "";
+        message.expirationDate = object.expirationDate ?? undefined;
         message.photo = (object.photo !== undefined && object.photo !== null)
             ? DocumentPhoto.fromPartial(object.photo)
             : undefined;
