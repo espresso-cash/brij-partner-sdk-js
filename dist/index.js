@@ -1359,10 +1359,10 @@ const Document = {
     },
     fromJSON(object) {
         return {
-            type: isSet(object.type) ? documentTypeFromJSON(object.type) : 0,
-            number: isSet(object.number) ? globalThis.String(object.number) : "",
-            countryCode: isSet(object.countryCode) ? globalThis.String(object.countryCode) : "",
-            photo: isSet(object.photo) ? DocumentPhoto.fromJSON(object.photo) : undefined,
+            type: isSet$1(object.type) ? documentTypeFromJSON(object.type) : 0,
+            number: isSet$1(object.number) ? globalThis.String(object.number) : "",
+            countryCode: isSet$1(object.countryCode) ? globalThis.String(object.countryCode) : "",
+            photo: isSet$1(object.photo) ? DocumentPhoto.fromJSON(object.photo) : undefined,
         };
     },
     toJSON(message) {
@@ -1439,17 +1439,17 @@ const DocumentPhoto = {
     },
     fromJSON(object) {
         return {
-            frontImage: isSet(object.frontImage) ? bytesFromBase64(object.frontImage) : undefined,
-            backImage: isSet(object.backImage) ? bytesFromBase64(object.backImage) : undefined,
+            frontImage: isSet$1(object.frontImage) ? bytesFromBase64$1(object.frontImage) : undefined,
+            backImage: isSet$1(object.backImage) ? bytesFromBase64$1(object.backImage) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.frontImage !== undefined) {
-            obj.frontImage = base64FromBytes(message.frontImage);
+            obj.frontImage = base64FromBytes$1(message.frontImage);
         }
         if (message.backImage !== undefined) {
-            obj.backImage = base64FromBytes(message.backImage);
+            obj.backImage = base64FromBytes$1(message.backImage);
         }
         return obj;
     },
@@ -1527,10 +1527,10 @@ const BankInfo = {
     },
     fromJSON(object) {
         return {
-            accountNumber: isSet(object.accountNumber) ? globalThis.String(object.accountNumber) : "",
-            bankCode: isSet(object.bankCode) ? globalThis.String(object.bankCode) : "",
-            bankName: isSet(object.bankName) ? globalThis.String(object.bankName) : "",
-            countryCode: isSet(object.countryCode) ? globalThis.String(object.countryCode) : "",
+            accountNumber: isSet$1(object.accountNumber) ? globalThis.String(object.accountNumber) : "",
+            bankCode: isSet$1(object.bankCode) ? globalThis.String(object.bankCode) : "",
+            bankName: isSet$1(object.bankName) ? globalThis.String(object.bankName) : "",
+            countryCode: isSet$1(object.countryCode) ? globalThis.String(object.countryCode) : "",
         };
     },
     toJSON(message) {
