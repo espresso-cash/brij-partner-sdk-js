@@ -19,6 +19,7 @@ export enum DataType {
   DATA_TYPE_DOCUMENT = 5,
   DATA_TYPE_BANK_INFO = 6,
   DATA_TYPE_SELFIE_IMAGE = 7,
+  DATA_TYPE_CITIZENSHIP = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -48,6 +49,9 @@ export function dataTypeFromJSON(object: any): DataType {
     case 7:
     case "DATA_TYPE_SELFIE_IMAGE":
       return DataType.DATA_TYPE_SELFIE_IMAGE;
+    case 8:
+    case "DATA_TYPE_CITIZENSHIP":
+      return DataType.DATA_TYPE_CITIZENSHIP;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -73,6 +77,8 @@ export function dataTypeToJSON(object: DataType): string {
       return "DATA_TYPE_BANK_INFO";
     case DataType.DATA_TYPE_SELFIE_IMAGE:
       return "DATA_TYPE_SELFIE_IMAGE";
+    case DataType.DATA_TYPE_CITIZENSHIP:
+      return "DATA_TYPE_CITIZENSHIP";
     case DataType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -82,6 +88,9 @@ export function dataTypeToJSON(object: DataType): string {
 export enum DocumentType {
   DOCUMENT_TYPE_UNSPECIFIED = 0,
   DOCUMENT_TYPE_VOTER_ID = 1,
+  DOCUMENT_TYPE_NIN_V2 = 2,
+  DOCUMENT_TYPE_PASSPORT = 3,
+  DOCUMENT_TYPE_ID_CARD = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -93,6 +102,15 @@ export function documentTypeFromJSON(object: any): DocumentType {
     case 1:
     case "DOCUMENT_TYPE_VOTER_ID":
       return DocumentType.DOCUMENT_TYPE_VOTER_ID;
+    case 2:
+    case "DOCUMENT_TYPE_NIN_V2":
+      return DocumentType.DOCUMENT_TYPE_NIN_V2;
+    case 3:
+    case "DOCUMENT_TYPE_PASSPORT":
+      return DocumentType.DOCUMENT_TYPE_PASSPORT;
+    case 4:
+    case "DOCUMENT_TYPE_ID_CARD":
+      return DocumentType.DOCUMENT_TYPE_ID_CARD;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -106,6 +124,12 @@ export function documentTypeToJSON(object: DocumentType): string {
       return "DOCUMENT_TYPE_UNSPECIFIED";
     case DocumentType.DOCUMENT_TYPE_VOTER_ID:
       return "DOCUMENT_TYPE_VOTER_ID";
+    case DocumentType.DOCUMENT_TYPE_NIN_V2:
+      return "DOCUMENT_TYPE_NIN_V2";
+    case DocumentType.DOCUMENT_TYPE_PASSPORT:
+      return "DOCUMENT_TYPE_PASSPORT";
+    case DocumentType.DOCUMENT_TYPE_ID_CARD:
+      return "DOCUMENT_TYPE_ID_CARD";
     case DocumentType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -125,12 +149,20 @@ export interface Document {
   type: DocumentType;
   number: string;
   countryCode: string;
+  expirationDate?: Date | undefined;
+  photo?: DocumentPhoto | undefined;
+}
+
+export interface DocumentPhoto {
+  frontImage?: Uint8Array | undefined;
+  backImage?: Uint8Array | undefined;
 }
 
 export interface BankInfo {
   accountNumber: string;
   bankCode: string;
   bankName: string;
+  countryCode: string;
 }
 
 export interface Email {
@@ -142,6 +174,10 @@ export interface SelfieImage {
 }
 
 export interface Phone {
+  value: string;
+}
+
+export interface Citizenship {
   value: string;
 }
 
@@ -280,7 +316,7 @@ export const BirthDate: MessageFns<BirthDate> = {
 };
 
 function createBaseDocument(): Document {
-  return { type: 0, number: "", countryCode: "" };
+  return { type: 0, number: "", countryCode: "", expirationDate: undefined, photo: undefined };
 }
 
 export const Document: MessageFns<Document> = {
@@ -293,6 +329,12 @@ export const Document: MessageFns<Document> = {
     }
     if (message.countryCode !== "") {
       writer.uint32(26).string(message.countryCode);
+    }
+    if (message.expirationDate !== undefined) {
+      Timestamp.encode(toTimestamp(message.expirationDate), writer.uint32(34).fork()).join();
+    }
+    if (message.photo !== undefined) {
+      DocumentPhoto.encode(message.photo, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -328,6 +370,22 @@ export const Document: MessageFns<Document> = {
           message.countryCode = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.expirationDate = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.photo = DocumentPhoto.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -342,6 +400,8 @@ export const Document: MessageFns<Document> = {
       type: isSet(object.type) ? documentTypeFromJSON(object.type) : 0,
       number: isSet(object.number) ? globalThis.String(object.number) : "",
       countryCode: isSet(object.countryCode) ? globalThis.String(object.countryCode) : "",
+      expirationDate: isSet(object.expirationDate) ? fromJsonTimestamp(object.expirationDate) : undefined,
+      photo: isSet(object.photo) ? DocumentPhoto.fromJSON(object.photo) : undefined,
     };
   },
 
@@ -356,6 +416,12 @@ export const Document: MessageFns<Document> = {
     if (message.countryCode !== "") {
       obj.countryCode = message.countryCode;
     }
+    if (message.expirationDate !== undefined) {
+      obj.expirationDate = message.expirationDate.toISOString();
+    }
+    if (message.photo !== undefined) {
+      obj.photo = DocumentPhoto.toJSON(message.photo);
+    }
     return obj;
   },
 
@@ -367,12 +433,92 @@ export const Document: MessageFns<Document> = {
     message.type = object.type ?? 0;
     message.number = object.number ?? "";
     message.countryCode = object.countryCode ?? "";
+    message.expirationDate = object.expirationDate ?? undefined;
+    message.photo = (object.photo !== undefined && object.photo !== null)
+      ? DocumentPhoto.fromPartial(object.photo)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDocumentPhoto(): DocumentPhoto {
+  return { frontImage: undefined, backImage: undefined };
+}
+
+export const DocumentPhoto: MessageFns<DocumentPhoto> = {
+  encode(message: DocumentPhoto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.frontImage !== undefined) {
+      writer.uint32(34).bytes(message.frontImage);
+    }
+    if (message.backImage !== undefined) {
+      writer.uint32(42).bytes(message.backImage);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DocumentPhoto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDocumentPhoto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.frontImage = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.backImage = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DocumentPhoto {
+    return {
+      frontImage: isSet(object.frontImage) ? bytesFromBase64(object.frontImage) : undefined,
+      backImage: isSet(object.backImage) ? bytesFromBase64(object.backImage) : undefined,
+    };
+  },
+
+  toJSON(message: DocumentPhoto): unknown {
+    const obj: any = {};
+    if (message.frontImage !== undefined) {
+      obj.frontImage = base64FromBytes(message.frontImage);
+    }
+    if (message.backImage !== undefined) {
+      obj.backImage = base64FromBytes(message.backImage);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DocumentPhoto>, I>>(base?: I): DocumentPhoto {
+    return DocumentPhoto.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DocumentPhoto>, I>>(object: I): DocumentPhoto {
+    const message = createBaseDocumentPhoto();
+    message.frontImage = object.frontImage ?? undefined;
+    message.backImage = object.backImage ?? undefined;
     return message;
   },
 };
 
 function createBaseBankInfo(): BankInfo {
-  return { accountNumber: "", bankCode: "", bankName: "" };
+  return { accountNumber: "", bankCode: "", bankName: "", countryCode: "" };
 }
 
 export const BankInfo: MessageFns<BankInfo> = {
@@ -385,6 +531,9 @@ export const BankInfo: MessageFns<BankInfo> = {
     }
     if (message.bankName !== "") {
       writer.uint32(26).string(message.bankName);
+    }
+    if (message.countryCode !== "") {
+      writer.uint32(34).string(message.countryCode);
     }
     return writer;
   },
@@ -420,6 +569,14 @@ export const BankInfo: MessageFns<BankInfo> = {
           message.bankName = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.countryCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -434,6 +591,7 @@ export const BankInfo: MessageFns<BankInfo> = {
       accountNumber: isSet(object.accountNumber) ? globalThis.String(object.accountNumber) : "",
       bankCode: isSet(object.bankCode) ? globalThis.String(object.bankCode) : "",
       bankName: isSet(object.bankName) ? globalThis.String(object.bankName) : "",
+      countryCode: isSet(object.countryCode) ? globalThis.String(object.countryCode) : "",
     };
   },
 
@@ -448,6 +606,9 @@ export const BankInfo: MessageFns<BankInfo> = {
     if (message.bankName !== "") {
       obj.bankName = message.bankName;
     }
+    if (message.countryCode !== "") {
+      obj.countryCode = message.countryCode;
+    }
     return obj;
   },
 
@@ -459,6 +620,7 @@ export const BankInfo: MessageFns<BankInfo> = {
     message.accountNumber = object.accountNumber ?? "";
     message.bankCode = object.bankCode ?? "";
     message.bankName = object.bankName ?? "";
+    message.countryCode = object.countryCode ?? "";
     return message;
   },
 };
@@ -632,6 +794,64 @@ export const Phone: MessageFns<Phone> = {
   },
   fromPartial<I extends Exact<DeepPartial<Phone>, I>>(object: I): Phone {
     const message = createBasePhone();
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseCitizenship(): Citizenship {
+  return { value: "" };
+}
+
+export const Citizenship: MessageFns<Citizenship> = {
+  encode(message: Citizenship, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.value !== "") {
+      writer.uint32(10).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Citizenship {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCitizenship();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Citizenship {
+    return { value: isSet(object.value) ? globalThis.String(object.value) : "" };
+  },
+
+  toJSON(message: Citizenship): unknown {
+    const obj: any = {};
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<Citizenship>, I>>(base?: I): Citizenship {
+    return Citizenship.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<Citizenship>, I>>(object: I): Citizenship {
+    const message = createBaseCitizenship();
     message.value = object.value ?? "";
     return message;
   },

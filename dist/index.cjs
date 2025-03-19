@@ -1103,6 +1103,7 @@ var DataType;
     DataType[DataType["DATA_TYPE_DOCUMENT"] = 5] = "DATA_TYPE_DOCUMENT";
     DataType[DataType["DATA_TYPE_BANK_INFO"] = 6] = "DATA_TYPE_BANK_INFO";
     DataType[DataType["DATA_TYPE_SELFIE_IMAGE"] = 7] = "DATA_TYPE_SELFIE_IMAGE";
+    DataType[DataType["DATA_TYPE_CITIZENSHIP"] = 8] = "DATA_TYPE_CITIZENSHIP";
     DataType[DataType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(DataType || (DataType = {}));
 function dataTypeFromJSON(object) {
@@ -1131,6 +1132,9 @@ function dataTypeFromJSON(object) {
         case 7:
         case "DATA_TYPE_SELFIE_IMAGE":
             return DataType.DATA_TYPE_SELFIE_IMAGE;
+        case 8:
+        case "DATA_TYPE_CITIZENSHIP":
+            return DataType.DATA_TYPE_CITIZENSHIP;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -1141,6 +1145,9 @@ var DocumentType;
 (function (DocumentType) {
     DocumentType[DocumentType["DOCUMENT_TYPE_UNSPECIFIED"] = 0] = "DOCUMENT_TYPE_UNSPECIFIED";
     DocumentType[DocumentType["DOCUMENT_TYPE_VOTER_ID"] = 1] = "DOCUMENT_TYPE_VOTER_ID";
+    DocumentType[DocumentType["DOCUMENT_TYPE_NIN_V2"] = 2] = "DOCUMENT_TYPE_NIN_V2";
+    DocumentType[DocumentType["DOCUMENT_TYPE_PASSPORT"] = 3] = "DOCUMENT_TYPE_PASSPORT";
+    DocumentType[DocumentType["DOCUMENT_TYPE_ID_CARD"] = 4] = "DOCUMENT_TYPE_ID_CARD";
     DocumentType[DocumentType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(DocumentType || (DocumentType = {}));
 function documentTypeFromJSON(object) {
@@ -1151,6 +1158,15 @@ function documentTypeFromJSON(object) {
         case 1:
         case "DOCUMENT_TYPE_VOTER_ID":
             return DocumentType.DOCUMENT_TYPE_VOTER_ID;
+        case 2:
+        case "DOCUMENT_TYPE_NIN_V2":
+            return DocumentType.DOCUMENT_TYPE_NIN_V2;
+        case 3:
+        case "DOCUMENT_TYPE_PASSPORT":
+            return DocumentType.DOCUMENT_TYPE_PASSPORT;
+        case 4:
+        case "DOCUMENT_TYPE_ID_CARD":
+            return DocumentType.DOCUMENT_TYPE_ID_CARD;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -1163,6 +1179,12 @@ function documentTypeToJSON(object) {
             return "DOCUMENT_TYPE_UNSPECIFIED";
         case DocumentType.DOCUMENT_TYPE_VOTER_ID:
             return "DOCUMENT_TYPE_VOTER_ID";
+        case DocumentType.DOCUMENT_TYPE_NIN_V2:
+            return "DOCUMENT_TYPE_NIN_V2";
+        case DocumentType.DOCUMENT_TYPE_PASSPORT:
+            return "DOCUMENT_TYPE_PASSPORT";
+        case DocumentType.DOCUMENT_TYPE_ID_CARD:
+            return "DOCUMENT_TYPE_ID_CARD";
         case DocumentType.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -1288,7 +1310,7 @@ const BirthDate = {
     },
 };
 function createBaseDocument() {
-    return { type: 0, number: "", countryCode: "" };
+    return { type: 0, number: "", countryCode: "", expirationDate: undefined, photo: undefined };
 }
 const Document = {
     encode(message, writer = new BinaryWriter()) {
@@ -1300,6 +1322,12 @@ const Document = {
         }
         if (message.countryCode !== "") {
             writer.uint32(26).string(message.countryCode);
+        }
+        if (message.expirationDate !== undefined) {
+            Timestamp.encode(toTimestamp(message.expirationDate), writer.uint32(34).fork()).join();
+        }
+        if (message.photo !== undefined) {
+            DocumentPhoto.encode(message.photo, writer.uint32(42).fork()).join();
         }
         return writer;
     },
@@ -1331,6 +1359,20 @@ const Document = {
                     message.countryCode = reader.string();
                     continue;
                 }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.expirationDate = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.photo = DocumentPhoto.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1344,6 +1386,8 @@ const Document = {
             type: isSet$1(object.type) ? documentTypeFromJSON(object.type) : 0,
             number: isSet$1(object.number) ? globalThis.String(object.number) : "",
             countryCode: isSet$1(object.countryCode) ? globalThis.String(object.countryCode) : "",
+            expirationDate: isSet$1(object.expirationDate) ? fromJsonTimestamp(object.expirationDate) : undefined,
+            photo: isSet$1(object.photo) ? DocumentPhoto.fromJSON(object.photo) : undefined,
         };
     },
     toJSON(message) {
@@ -1357,6 +1401,12 @@ const Document = {
         if (message.countryCode !== "") {
             obj.countryCode = message.countryCode;
         }
+        if (message.expirationDate !== undefined) {
+            obj.expirationDate = message.expirationDate.toISOString();
+        }
+        if (message.photo !== undefined) {
+            obj.photo = DocumentPhoto.toJSON(message.photo);
+        }
         return obj;
     },
     create(base) {
@@ -1367,11 +1417,83 @@ const Document = {
         message.type = object.type ?? 0;
         message.number = object.number ?? "";
         message.countryCode = object.countryCode ?? "";
+        message.expirationDate = object.expirationDate ?? undefined;
+        message.photo = (object.photo !== undefined && object.photo !== null)
+            ? DocumentPhoto.fromPartial(object.photo)
+            : undefined;
+        return message;
+    },
+};
+function createBaseDocumentPhoto() {
+    return { frontImage: undefined, backImage: undefined };
+}
+const DocumentPhoto = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.frontImage !== undefined) {
+            writer.uint32(34).bytes(message.frontImage);
+        }
+        if (message.backImage !== undefined) {
+            writer.uint32(42).bytes(message.backImage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseDocumentPhoto();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.frontImage = reader.bytes();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.backImage = reader.bytes();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            frontImage: isSet$1(object.frontImage) ? bytesFromBase64$1(object.frontImage) : undefined,
+            backImage: isSet$1(object.backImage) ? bytesFromBase64$1(object.backImage) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.frontImage !== undefined) {
+            obj.frontImage = base64FromBytes$1(message.frontImage);
+        }
+        if (message.backImage !== undefined) {
+            obj.backImage = base64FromBytes$1(message.backImage);
+        }
+        return obj;
+    },
+    create(base) {
+        return DocumentPhoto.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseDocumentPhoto();
+        message.frontImage = object.frontImage ?? undefined;
+        message.backImage = object.backImage ?? undefined;
         return message;
     },
 };
 function createBaseBankInfo() {
-    return { accountNumber: "", bankCode: "", bankName: "" };
+    return { accountNumber: "", bankCode: "", bankName: "", countryCode: "" };
 }
 const BankInfo = {
     encode(message, writer = new BinaryWriter()) {
@@ -1383,6 +1505,9 @@ const BankInfo = {
         }
         if (message.bankName !== "") {
             writer.uint32(26).string(message.bankName);
+        }
+        if (message.countryCode !== "") {
+            writer.uint32(34).string(message.countryCode);
         }
         return writer;
     },
@@ -1414,6 +1539,13 @@ const BankInfo = {
                     message.bankName = reader.string();
                     continue;
                 }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.countryCode = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1427,6 +1559,7 @@ const BankInfo = {
             accountNumber: isSet$1(object.accountNumber) ? globalThis.String(object.accountNumber) : "",
             bankCode: isSet$1(object.bankCode) ? globalThis.String(object.bankCode) : "",
             bankName: isSet$1(object.bankName) ? globalThis.String(object.bankName) : "",
+            countryCode: isSet$1(object.countryCode) ? globalThis.String(object.countryCode) : "",
         };
     },
     toJSON(message) {
@@ -1440,6 +1573,9 @@ const BankInfo = {
         if (message.bankName !== "") {
             obj.bankName = message.bankName;
         }
+        if (message.countryCode !== "") {
+            obj.countryCode = message.countryCode;
+        }
         return obj;
     },
     create(base) {
@@ -1450,6 +1586,7 @@ const BankInfo = {
         message.accountNumber = object.accountNumber ?? "";
         message.bankCode = object.bankCode ?? "";
         message.bankName = object.bankName ?? "";
+        message.countryCode = object.countryCode ?? "";
         return message;
     },
 };
@@ -2129,6 +2266,8 @@ class BrijPartnerClient {
         ]));
         const userData = {};
         const secret = base58__default.default.decode(secretKey);
+        const documentList = [];
+        const bankInfoList = [];
         for (const encrypted of responseData.userData) {
             const decryptedData = encrypted.encryptedValue?.trim()
                 ? await this.decryptData(naclUtil__default.default.decodeBase64(encrypted.encryptedValue), secret)
@@ -2164,22 +2303,22 @@ class BrijPartnerClient {
                 }
                 case DataType.DATA_TYPE_DOCUMENT: {
                     const data = Document.decode(decryptedData);
-                    userData.document = {
+                    documentList.push({
                         type: documentTypeToJSON(data.type),
                         number: data.number,
                         countryCode: data.countryCode,
                         ...commonFields,
-                    };
+                    });
                     break;
                 }
                 case DataType.DATA_TYPE_BANK_INFO: {
                     const data = BankInfo.decode(decryptedData);
-                    userData.bankInfo = {
+                    bankInfoList.push({
                         bankName: data.bankName,
                         accountNumber: data.accountNumber,
                         bankCode: data.bankCode,
                         ...commonFields,
-                    };
+                    });
                     break;
                 }
                 case DataType.DATA_TYPE_SELFIE_IMAGE: {
@@ -2196,6 +2335,12 @@ class BrijPartnerClient {
             const decryptedValue = await this.decryptData(naclUtil__default.default.decodeBase64(data.encryptedValue), secret);
             return [data.id, new TextDecoder().decode(decryptedValue)];
         })));
+        if (documentList.length > 0) {
+            userData.document = documentList;
+        }
+        if (bankInfoList.length > 0) {
+            userData.bankInfo = bankInfoList;
+        }
         return userData;
     }
     async decryptOrderFields(order, secretKey) {

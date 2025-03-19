@@ -105,8 +105,8 @@ export type UserData = {
   phone?: UserDataValueField<string>;
   name?: { firstName: string; lastName: string } & UserDataField;
   birthDate?: UserDataValueField<Date>;
-  document?: { type: string; number: string; countryCode: string } & UserDataField;
-  bankInfo?: { bankName: string; accountNumber: string; bankCode: string } & UserDataField;
+  document?: ({ type: string; number: string; countryCode: string } & UserDataField)[];
+  bankInfo?: ({ bankName: string; accountNumber: string; bankCode: string } & UserDataField)[];
   selfie?: UserDataValueField<Uint8Array>;
   custom?: Record<string, string>;
 };
@@ -297,6 +297,9 @@ export class BrijPartnerClient {
     const userData: UserData = {};
     const secret = base58.decode(secretKey);
 
+    const documentList: ({ type: string; number: string; countryCode: string } & UserDataField)[] = [];
+    const bankInfoList: ({ bankName: string; accountNumber: string; bankCode: string } & UserDataField)[] = [];
+
     for (const encrypted of responseData.userData) {
       const decryptedData = encrypted.encryptedValue?.trim()
         ? await this.decryptData(naclUtil.decodeBase64(encrypted.encryptedValue), secret)
@@ -334,22 +337,22 @@ export class BrijPartnerClient {
         }
         case DataType.DATA_TYPE_DOCUMENT: {
           const data = Document.decode(decryptedData);
-          userData.document = {
+          documentList.push({
             type: documentTypeToJSON(data.type),
             number: data.number,
             countryCode: data.countryCode,
             ...commonFields,
-          };
+          });
           break;
         }
         case DataType.DATA_TYPE_BANK_INFO: {
           const data = BankInfo.decode(decryptedData);
-          userData.bankInfo = {
+          bankInfoList.push({
             bankName: data.bankName,
             accountNumber: data.accountNumber,
             bankCode: data.bankCode,
             ...commonFields,
-          };
+          });
           break;
         }
         case DataType.DATA_TYPE_SELFIE_IMAGE: {
@@ -371,6 +374,13 @@ export class BrijPartnerClient {
         })
       )
     );
+
+    if (documentList.length > 0) {
+      userData.document = documentList;
+    }
+    if (bankInfoList.length > 0) {
+      userData.bankInfo = bankInfoList;
+    }
 
     return userData;
   }
