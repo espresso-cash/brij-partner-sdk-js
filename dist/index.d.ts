@@ -95,6 +95,7 @@ type Order = {
     transactionId: string;
     userSignature?: string;
     partnerSignature?: string;
+    userWalletAddress?: string;
 };
 declare enum KycStatus {
     Unspecified = "KYC_STATUS_UNSPECIFIED",
