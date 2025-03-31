@@ -69,7 +69,7 @@ An order has the following structure:
 
 ### Getting User Data and Verification Info
 
-To access user data, first obtain the user’s secret key:
+To access user data, first obtain the user's secret key:
 
 ```Javascript
 const secretKey = await client.getUserSecretKey(order.userPublicKey);
@@ -79,7 +79,7 @@ console.log('userSecretKey:', secretKey);
 > [!WARNING]
 > Do not store this key in your database; instead, use the SDK to retrieve it when needed.
 
-Using this key, you can access the user’s raw information:
+Using this key, you can access the user's raw information:
 
 ```Javascript
 const data = await client.getUserData({
@@ -202,7 +202,7 @@ The status can be one of the following values:
 
 ### Accepting and Completing the On-Ramp Order
 
-If, based on the user and order information, you’re ready to proceed with the order, you should accept it and specify the bank name, bank account information. You can also pass your internal order ID in the parameter as a reference:
+If, based on the user and order information, you're ready to proceed with the order, you should accept it and specify the bank name, bank account information. You can also pass your internal order ID in the parameter as a reference:
 
 ```Javascript
 await client.acceptOnRampOrder({
@@ -213,7 +213,24 @@ await client.acceptOnRampOrder({
 });
 ```
 
-Once you’ve received the payment, transfer crypto to the user’s address and complete the order by specifying the transaction ID of the crypto payment:
+Once you've received the payment, you can generate a transaction to transfer crypto to the user:
+
+```Javascript
+const transaction = await client.generateTransaction({
+    orderId: order.orderId,
+    fundingWalletAddress: 'YOUR_FUNDING_WALLET_ADDRESS',
+    externalId: 'EXTERNAL_ID',
+});
+console.log(transaction); // Transaction string to be used for the transfer
+```
+
+> [!IMPORTANT]
+>  `fundingWalletAddress` is the wallet address used to send the funds to the user
+
+> [!IMPORTANT]
+> The `generateTransaction` method can only be called after accepting the order and after you have externally verified that the fiat funds have been received. This method generates the transaction needed to complete the on-ramp transfer.
+
+After executing the transaction, complete the order by specifying the transaction ID of the crypto payment:
 
 ```Javascript
 await client.completeOnRampOrder({
@@ -222,7 +239,7 @@ await client.completeOnRampOrder({
 });
 ```
 
-You can fetch the user’s wallet address using the following code:
+You can fetch the user's wallet address using the following code:
 
 ```Javascript
 const info = await client.getUserInfo(order.userPublicKey);
@@ -231,7 +248,7 @@ console.log(info.walletAddress); // EJpGLU94vxBHDFhN9sYwkQmrfTeFNpVViyy2EVaGbUky
 
 ### Accepting and Completing the Off-Ramp Order
 
-Similar to On-Ramp order, once you’re ready to proceed, you should accept it and specify
+Similar to On-Ramp order, once you're ready to proceed, you should accept it and specify
 the crypto wallet address and external ID:
 
 ```Javascript
@@ -242,7 +259,7 @@ await client.acceptOffRampOrder({
 });
 ```
 
-Once you’ve received the payment, transfer fiat to the user’s bank account and complete the order.
+Once you've received the payment, transfer fiat to the user's bank account and complete the order.
 
 ```Javascript
 await client.completeOffRampOrder({
@@ -250,7 +267,7 @@ await client.completeOffRampOrder({
 });
 ```
 
-You can fetch the user’s bank details using the following code:
+You can fetch the user's bank details using the following code:
 
 ```Javascript
 const order = await client.getOrder(response.orderId);
@@ -260,7 +277,7 @@ console.log(order.bankAccount); // 12345678
 
 ### Rejecting the Order
 
-If you’re not ready to process the order, you can reject it and specify the reason. This reason is not currently visible to the user; it is needed for internal tracking.
+If you're not ready to process the order, you can reject it and specify the reason. This reason is not currently visible to the user; it is needed for internal tracking.
 
 ```Javascript
 await client.rejectOrder({
@@ -272,7 +289,7 @@ await client.rejectOrder({
 ### Failing an Accepted Order
 
 > [!CAUTION]
-> After accepting an order, it’s potentially unsafe to fail it since the user has probably sent the money. This should only be used if you’re certain that the order cannot be completed.
+> After accepting an order, it's potentially unsafe to fail it since the user has probably sent the money. This should only be used if you're certain that the order cannot be completed.
 
 ```Javascript
 await client.failOrder({
