@@ -2371,6 +2371,7 @@ class BrijPartnerClient {
                     cryptoCurrency: order.cryptoCurrency,
                     fiatAmount: order.fiatAmount,
                     fiatCurrency: order.fiatCurrency,
+                    cryptoWalletAddress: order.userWalletAddress ?? "",
                 })
                 : this.createUserOffRampMessage({
                     cryptoAmount: order.cryptoAmount,
@@ -2379,6 +2380,7 @@ class BrijPartnerClient {
                     fiatCurrency: order.fiatCurrency,
                     bankName: decryptedOrder.bankName,
                     bankAccount: decryptedOrder.bankAccount,
+                    cryptoWalletAddress: order.userWalletAddress ?? "",
                 });
             const isValidUserSig = nacl__default.default.sign.detached.verify(new TextEncoder().encode(userMessage), base58__default.default.decode(order.userSignature), userVerifyKey);
             if (!isValidUserSig) {
@@ -2569,15 +2571,15 @@ class BrijPartnerClient {
         }
         return Math.round(amount * Math.pow(10, decimals)).toString();
     }
-    createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, }) {
+    createUserOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, cryptoWalletAddress, }) {
         const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
         const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
-        return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}`;
+        return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
     }
-    createUserOffRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, bankName, bankAccount, }) {
+    createUserOffRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, bankName, bankAccount, cryptoWalletAddress, }) {
         const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
         const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
-        return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
+        return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}|${cryptoWalletAddress}`;
     }
     createPartnerOnRampMessage({ cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, bankName, bankAccount, }) {
         const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
