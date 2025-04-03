@@ -167,7 +167,7 @@ export enum KycStatus {
 }
 
 export interface KycItem {
-  country: string;
+  countries: string[];
   status: KycStatus;
   provider: string;
   userPublicKey: string;
@@ -626,7 +626,7 @@ export class BrijPartnerClient {
     const decoded = KycItemProto.decode(uint8Array);
   
     const kycItem: KycItem = {
-      country: decoded.country,
+      countries: decoded.countries,
       status: toKycStatus(decoded.status),
       provider: decoded.provider,
       userPublicKey: decoded.userPublicKey,

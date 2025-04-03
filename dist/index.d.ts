@@ -104,7 +104,7 @@ declare enum KycStatus {
     Rejected = "KYC_STATUS_REJECTED"
 }
 interface KycItem {
-    country: string;
+    countries: string[];
     status: KycStatus;
     provider: string;
     userPublicKey: string;

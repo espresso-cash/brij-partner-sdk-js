@@ -1878,12 +1878,12 @@ function kycStatusToJSON(object) {
     }
 }
 function createBaseKycItem() {
-    return { country: "", status: 0, provider: "", userPublicKey: "", hashes: [], additionalData: {} };
+    return { countries: [], status: 0, provider: "", userPublicKey: "", hashes: [], additionalData: {} };
 }
 const KycItem = {
     encode(message, writer = new BinaryWriter()) {
-        if (message.country !== "") {
-            writer.uint32(10).string(message.country);
+        for (const v of message.countries) {
+            writer.uint32(10).string(v);
         }
         if (message.status !== 0) {
             writer.uint32(16).int32(message.status);
@@ -1913,7 +1913,7 @@ const KycItem = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.country = reader.string();
+                    message.countries.push(reader.string());
                     continue;
                 }
                 case 2: {
@@ -1964,7 +1964,9 @@ const KycItem = {
     },
     fromJSON(object) {
         return {
-            country: isSet(object.country) ? globalThis.String(object.country) : "",
+            countries: globalThis.Array.isArray(object?.countries)
+                ? object.countries.map((e) => globalThis.String(e))
+                : [],
             status: isSet(object.status) ? kycStatusFromJSON(object.status) : 0,
             provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
             userPublicKey: isSet(object.userPublicKey) ? globalThis.String(object.userPublicKey) : "",
@@ -1979,8 +1981,8 @@ const KycItem = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.country !== "") {
-            obj.country = message.country;
+        if (message.countries?.length) {
+            obj.countries = message.countries;
         }
         if (message.status !== 0) {
             obj.status = kycStatusToJSON(message.status);
@@ -2010,7 +2012,7 @@ const KycItem = {
     },
     fromPartial(object) {
         const message = createBaseKycItem();
-        message.country = object.country ?? "";
+        message.countries = object.countries?.map((e) => e) || [];
         message.status = object.status ?? 0;
         message.provider = object.provider ?? "";
         message.userPublicKey = object.userPublicKey ?? "";
@@ -2528,7 +2530,7 @@ class BrijPartnerClient {
         const uint8Array = naclUtil__default.default.decodeBase64(buffer);
         const decoded = KycItem.decode(uint8Array);
         const kycItem = {
-            country: decoded.country,
+            countries: decoded.countries,
             status: toKycStatus(decoded.status),
             provider: decoded.provider,
             userPublicKey: decoded.userPublicKey,
