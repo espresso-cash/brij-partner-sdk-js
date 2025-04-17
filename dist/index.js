@@ -2143,6 +2143,12 @@ var ValidationStatus;
     ValidationStatus["Rejected"] = "REJECTED";
     ValidationStatus["Unverified"] = "UNVERIFIED";
 })(ValidationStatus || (ValidationStatus = {}));
+var RampType;
+(function (RampType) {
+    RampType["Unspecified"] = "RAMP_TYPE_UNSPECIFIED";
+    RampType["OnRamp"] = "RAMP_TYPE_ON_RAMP";
+    RampType["OffRamp"] = "RAMP_TYPE_OFF_RAMP";
+})(RampType || (RampType = {}));
 function toValidationStatus(protoStatus) {
     switch (protoStatus) {
         case ValidationStatus$1.VALIDATION_STATUS_UNSPECIFIED:
@@ -2357,7 +2363,7 @@ class BrijPartnerClient {
         const decryptedOrder = await this.decryptOrderFields(order, secretKey);
         if (order.userSignature) {
             const userVerifyKey = base58.decode(order.userPublicKey);
-            const userMessage = order.type === "ON_RAMP"
+            const userMessage = order.type === RampType.OnRamp
                 ? this.createUserOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
                     cryptoCurrency: order.cryptoCurrency,
@@ -2381,7 +2387,7 @@ class BrijPartnerClient {
         }
         if (order.partnerSignature) {
             const partnerVerifyKey = base58.decode(order.partnerPublicKey);
-            const partnerMessage = order.type === "ON_RAMP"
+            const partnerMessage = order.type === RampType.OnRamp
                 ? this.createPartnerOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
                     cryptoCurrency: order.cryptoCurrency,
@@ -2488,6 +2494,9 @@ class BrijPartnerClient {
             orderId: orderId,
             reason: reason,
         });
+    }
+    async updateFees(params) {
+        await this._orderClient.post("/v1/updateFees", params);
     }
     async getUserInfo(publicKey) {
         const response = await this._storageClient.post("/v1/getInfo", {
@@ -2599,5 +2608,5 @@ function toKycStatus(protoStatus) {
     }
 }
 
-export { AppConfig, BrijPartnerClient, KycStatus, ValidationStatus };
+export { AppConfig, BrijPartnerClient, KycStatus, RampType, ValidationStatus };
 //# sourceMappingURL=index.js.map

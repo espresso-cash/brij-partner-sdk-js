@@ -75,6 +75,11 @@ declare enum ValidationStatus {
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
+declare enum RampType {
+    Unspecified = "RAMP_TYPE_UNSPECIFIED",
+    OnRamp = "RAMP_TYPE_ON_RAMP",
+    OffRamp = "RAMP_TYPE_OFF_RAMP"
+}
 type Order = {
     orderId: string;
     externalId?: string;
@@ -83,7 +88,7 @@ type Order = {
     partnerPublicKey: string;
     userPublicKey: string;
     comment: string;
-    type: "ON_RAMP" | "OFF_RAMP";
+    type: RampType;
     cryptoAmount: number;
     cryptoCurrency: string;
     fiatAmount: number;
@@ -96,6 +101,27 @@ type Order = {
     userSignature?: string;
     partnerSignature?: string;
     userWalletAddress?: string;
+};
+type UpdateFeesParams = {
+    onRampFee?: {
+        fixedFee: number;
+        percentageFee: number;
+        conversionRates: {
+            cryptoCurrency: string;
+            fiatCurrency: string;
+            rate: number;
+        };
+    };
+    offRampFee?: {
+        fixedFee: number;
+        percentageFee: number;
+        conversionRates: {
+            cryptoCurrency: string;
+            fiatCurrency: string;
+            rate: number;
+        };
+    };
+    walletAddress?: string;
 };
 declare enum KycStatus {
     Unspecified = "KYC_STATUS_UNSPECIFIED",
@@ -150,6 +176,7 @@ declare class BrijPartnerClient {
     completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void>;
     failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void>;
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
+    updateFees(params: UpdateFeesParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
     getKycStatusDetails(params: {
@@ -165,4 +192,4 @@ declare class BrijPartnerClient {
     private createPartnerOffRampMessage;
 }
 
-export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, type RejectOrderParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
+export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, RampType, type RejectOrderParams, type UpdateFeesParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
