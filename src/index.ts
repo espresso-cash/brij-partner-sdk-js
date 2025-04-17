@@ -121,6 +121,12 @@ export enum ValidationStatus {
   Unverified = "UNVERIFIED",
 }
 
+export enum RampType {
+  Unspecified = "RAMP_TYPE_UNSPECIFIED",
+  OnRamp = "RAMP_TYPE_ON_RAMP",
+  OffRamp = "RAMP_TYPE_OFF_RAMP"
+}
+
 export type Order = {
   orderId: string;
   externalId?: string;
@@ -129,7 +135,7 @@ export type Order = {
   partnerPublicKey: string;
   userPublicKey: string;
   comment: string;
-  type: "ON_RAMP" | "OFF_RAMP";
+  type: RampType;
   cryptoAmount: number;
   cryptoCurrency: string;
   fiatAmount: number;
@@ -142,6 +148,28 @@ export type Order = {
   userSignature?: string;
   partnerSignature?: string;
   userWalletAddress?: string;
+};
+
+export type UpdateFeesParams = {
+  onRampFee?: {
+    fixedFee: number;
+    percentageFee: number;
+    conversionRates: {
+      cryptoCurrency: string;
+      fiatCurrency: string;
+      rate: number;
+    };
+  };
+  offRampFee?: {
+    fixedFee: number;
+    percentageFee: number;
+    conversionRates: {
+      cryptoCurrency: string;
+      fiatCurrency: string;
+      rate: number;
+    };
+  };
+  walletAddress?: string;
 };
 
 function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
@@ -410,7 +438,7 @@ export class BrijPartnerClient {
     if (order.userSignature) {
       const userVerifyKey = base58.decode(order.userPublicKey);
       const userMessage =
-        order.type === "ON_RAMP"
+        order.type === RampType.OnRamp
           ? this.createUserOnRampMessage({
               cryptoAmount: order.cryptoAmount,
               cryptoCurrency: order.cryptoCurrency,
@@ -442,7 +470,7 @@ export class BrijPartnerClient {
     if (order.partnerSignature) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
       const partnerMessage =
-        order.type === "ON_RAMP"
+        order.type === RampType.OnRamp
           ? this.createPartnerOnRampMessage({
               cryptoAmount: order.cryptoAmount,
               cryptoCurrency: order.cryptoCurrency,
@@ -581,6 +609,10 @@ export class BrijPartnerClient {
       orderId: orderId,
       reason: reason,
     });
+  }
+
+  async updateFees(params: UpdateFeesParams): Promise<void> {
+    await this._orderClient!.post("/v1/updateFees", params);
   }
 
   async getUserInfo(publicKey: string) {
