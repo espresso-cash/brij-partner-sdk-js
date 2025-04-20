@@ -2411,7 +2411,7 @@ class BrijPartnerClient {
         return decryptedOrder;
     }
     async getOrder({ externalId, orderId }) {
-        const response = await this._orderClient.post("/v1/getOrder", {
+        const response = await this._orderClient.post("/v1/partner/getOrder", {
             orderId,
             externalId,
         });
@@ -2419,7 +2419,7 @@ class BrijPartnerClient {
         return this.processOrder(response.data, base58.decode(secretKey));
     }
     async getPartnerOrders() {
-        const response = await this._orderClient.post("/v1/getPartnerOrders");
+        const response = await this._orderClient.post("/v1/partner/getOrders");
         return Promise.all(response.data.orders.map(async (order) => {
             const secretKey = await this.getUserSecretKey(order.userPublicKey);
             return this.processOrder(order, base58.decode(secretKey));
@@ -2443,7 +2443,7 @@ class BrijPartnerClient {
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
         const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
-        await this._orderClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/partner/acceptOrder", {
             orderId,
             bankName: encryptField(bankName),
             bankAccount: encryptField(bankAccount),
@@ -2462,7 +2462,7 @@ class BrijPartnerClient {
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
         const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
-        await this._orderClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/partner/acceptOrder", {
             orderId,
             cryptoWalletAddress,
             externalId,
@@ -2470,33 +2470,33 @@ class BrijPartnerClient {
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
-        await this._orderClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/partner/completeOrder", {
             orderId: orderId,
             transactionId: transactionId,
             externalId: externalId,
         });
     }
     async completeOffRampOrder({ orderId, externalId }) {
-        await this._orderClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/partner/completeOrder", {
             orderId: orderId,
             externalId: externalId,
         });
     }
     async failOrder({ orderId, reason, externalId }) {
-        await this._orderClient.post("/v1/failOrder", {
+        await this._orderClient.post("/v1/partner/failOrder", {
             orderId: orderId,
             reason: reason,
             externalId: externalId,
         });
     }
     async rejectOrder({ orderId, reason }) {
-        await this._orderClient.post("/v1/rejectOrder", {
+        await this._orderClient.post("/v1/partner/rejectOrder", {
             orderId: orderId,
             reason: reason,
         });
     }
     async updateFees(params) {
-        await this._orderClient.post("/v1/updateFees", params);
+        await this._orderClient.post("/v1/partner/updateFees", params);
     }
     async getUserInfo(publicKey) {
         const response = await this._storageClient.post("/v1/getInfo", {
