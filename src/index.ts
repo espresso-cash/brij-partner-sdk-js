@@ -280,7 +280,7 @@ export class BrijPartnerClient {
       headers: { Authorization: `Bearer ${storageToken}` },
     });
 
-    const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
+    const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
 
     this._orderClient = axios.create({
       baseURL: this.orderBaseUrl,
