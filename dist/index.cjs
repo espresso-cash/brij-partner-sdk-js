@@ -2239,7 +2239,7 @@ class BrijPartnerClient {
             baseURL: this.storageBaseUrl,
             headers: { Authorization: `Bearer ${storageToken}` },
         });
-        const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
+        const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
         this._orderClient = axios__default.default.create({
             baseURL: this.orderBaseUrl,
             headers: { Authorization: `Bearer ${orderToken}` },
@@ -2573,6 +2573,7 @@ class BrijPartnerClient {
         SOL: 9,
         // Fiat currencies
         USD: 2,
+        EUR: 2,
         NGN: 2,
     };
     convertToDecimalPrecision(amount, currency) {

@@ -700,6 +700,7 @@ export class BrijPartnerClient {
     SOL: 9,
     // Fiat currencies
     USD: 2,
+    EUR: 2,
     NGN: 2,
   };
 
