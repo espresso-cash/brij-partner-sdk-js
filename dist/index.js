@@ -2143,6 +2143,12 @@ var ValidationStatus;
     ValidationStatus["Rejected"] = "REJECTED";
     ValidationStatus["Unverified"] = "UNVERIFIED";
 })(ValidationStatus || (ValidationStatus = {}));
+var RampType;
+(function (RampType) {
+    RampType["Unspecified"] = "RAMP_TYPE_UNSPECIFIED";
+    RampType["OnRamp"] = "RAMP_TYPE_ON_RAMP";
+    RampType["OffRamp"] = "RAMP_TYPE_OFF_RAMP";
+})(RampType || (RampType = {}));
 function toValidationStatus(protoStatus) {
     switch (protoStatus) {
         case ValidationStatus$1.VALIDATION_STATUS_UNSPECIFIED:
@@ -2223,7 +2229,7 @@ class BrijPartnerClient {
             baseURL: this.storageBaseUrl,
             headers: { Authorization: `Bearer ${storageToken}` },
         });
-        const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
+        const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
         this._orderClient = axios.create({
             baseURL: this.orderBaseUrl,
             headers: { Authorization: `Bearer ${orderToken}` },
@@ -2357,7 +2363,7 @@ class BrijPartnerClient {
         const decryptedOrder = await this.decryptOrderFields(order, secretKey);
         if (order.userSignature) {
             const userVerifyKey = base58.decode(order.userPublicKey);
-            const userMessage = order.type === "ON_RAMP"
+            const userMessage = order.type === RampType.OnRamp
                 ? this.createUserOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
                     cryptoCurrency: order.cryptoCurrency,
@@ -2381,7 +2387,7 @@ class BrijPartnerClient {
         }
         if (order.partnerSignature) {
             const partnerVerifyKey = base58.decode(order.partnerPublicKey);
-            const partnerMessage = order.type === "ON_RAMP"
+            const partnerMessage = order.type === RampType.OnRamp
                 ? this.createPartnerOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
                     cryptoCurrency: order.cryptoCurrency,
@@ -2405,7 +2411,7 @@ class BrijPartnerClient {
         return decryptedOrder;
     }
     async getOrder({ externalId, orderId }) {
-        const response = await this._orderClient.post("/v1/getOrder", {
+        const response = await this._orderClient.post("/v1/partner/getOrder", {
             orderId,
             externalId,
         });
@@ -2413,7 +2419,7 @@ class BrijPartnerClient {
         return this.processOrder(response.data, base58.decode(secretKey));
     }
     async getPartnerOrders() {
-        const response = await this._orderClient.post("/v1/getPartnerOrders");
+        const response = await this._orderClient.post("/v1/partner/getOrders");
         return Promise.all(response.data.orders.map(async (order) => {
             const secretKey = await this.getUserSecretKey(order.userPublicKey);
             return this.processOrder(order, base58.decode(secretKey));
@@ -2437,7 +2443,7 @@ class BrijPartnerClient {
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
         const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
-        await this._orderClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/partner/acceptOrder", {
             orderId,
             bankName: encryptField(bankName),
             bankAccount: encryptField(bankAccount),
@@ -2456,7 +2462,7 @@ class BrijPartnerClient {
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
         const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
-        await this._orderClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/partner/acceptOrder", {
             orderId,
             cryptoWalletAddress,
             externalId,
@@ -2464,30 +2470,33 @@ class BrijPartnerClient {
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
-        await this._orderClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/partner/completeOrder", {
             orderId: orderId,
             transactionId: transactionId,
             externalId: externalId,
         });
     }
     async completeOffRampOrder({ orderId, externalId }) {
-        await this._orderClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/partner/completeOrder", {
             orderId: orderId,
             externalId: externalId,
         });
     }
     async failOrder({ orderId, reason, externalId }) {
-        await this._orderClient.post("/v1/failOrder", {
+        await this._orderClient.post("/v1/partner/failOrder", {
             orderId: orderId,
             reason: reason,
             externalId: externalId,
         });
     }
     async rejectOrder({ orderId, reason }) {
-        await this._orderClient.post("/v1/rejectOrder", {
+        await this._orderClient.post("/v1/partner/rejectOrder", {
             orderId: orderId,
             reason: reason,
         });
+    }
+    async updateFees(params) {
+        await this._orderClient.post("/v1/partner/updateFees", params);
     }
     async getUserInfo(publicKey) {
         const response = await this._storageClient.post("/v1/getInfo", {
@@ -2554,6 +2563,7 @@ class BrijPartnerClient {
         SOL: 9,
         // Fiat currencies
         USD: 2,
+        EUR: 2,
         NGN: 2,
     };
     convertToDecimalPrecision(amount, currency) {
@@ -2599,5 +2609,5 @@ function toKycStatus(protoStatus) {
     }
 }
 
-export { AppConfig, BrijPartnerClient, KycStatus, ValidationStatus };
+export { AppConfig, BrijPartnerClient, KycStatus, RampType, ValidationStatus };
 //# sourceMappingURL=index.js.map

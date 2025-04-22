@@ -121,6 +121,12 @@ export enum ValidationStatus {
   Unverified = "UNVERIFIED",
 }
 
+export enum RampType {
+  Unspecified = "RAMP_TYPE_UNSPECIFIED",
+  OnRamp = "RAMP_TYPE_ON_RAMP",
+  OffRamp = "RAMP_TYPE_OFF_RAMP"
+}
+
 export type Order = {
   orderId: string;
   externalId?: string;
@@ -129,7 +135,7 @@ export type Order = {
   partnerPublicKey: string;
   userPublicKey: string;
   comment: string;
-  type: "ON_RAMP" | "OFF_RAMP";
+  type: RampType;
   cryptoAmount: number;
   cryptoCurrency: string;
   fiatAmount: number;
@@ -142,6 +148,28 @@ export type Order = {
   userSignature?: string;
   partnerSignature?: string;
   userWalletAddress?: string;
+};
+
+export type UpdateFeesParams = {
+  onRampFee?: {
+    fixedFee: number;
+    percentageFee: number;
+    conversionRates: {
+      cryptoCurrency: string;
+      fiatCurrency: string;
+      rate: number;
+    };
+  };
+  offRampFee?: {
+    fixedFee: number;
+    percentageFee: number;
+    conversionRates: {
+      cryptoCurrency: string;
+      fiatCurrency: string;
+      rate: number;
+    };
+  };
+  walletAddress?: string;
 };
 
 function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
@@ -252,7 +280,7 @@ export class BrijPartnerClient {
       headers: { Authorization: `Bearer ${storageToken}` },
     });
 
-    const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
+    const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
 
     this._orderClient = axios.create({
       baseURL: this.orderBaseUrl,
@@ -410,7 +438,7 @@ export class BrijPartnerClient {
     if (order.userSignature) {
       const userVerifyKey = base58.decode(order.userPublicKey);
       const userMessage =
-        order.type === "ON_RAMP"
+        order.type === RampType.OnRamp
           ? this.createUserOnRampMessage({
               cryptoAmount: order.cryptoAmount,
               cryptoCurrency: order.cryptoCurrency,
@@ -442,7 +470,7 @@ export class BrijPartnerClient {
     if (order.partnerSignature) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
       const partnerMessage =
-        order.type === "ON_RAMP"
+        order.type === RampType.OnRamp
           ? this.createPartnerOnRampMessage({
               cryptoAmount: order.cryptoAmount,
               cryptoCurrency: order.cryptoCurrency,
@@ -474,7 +502,7 @@ export class BrijPartnerClient {
   }
 
   async getOrder({ externalId, orderId }: OrderIds): Promise<Order> {
-    const response = await this._orderClient!.post("/v1/getOrder", {
+    const response = await this._orderClient!.post("/v1/partner/getOrder", {
       orderId,
       externalId,
     });
@@ -484,7 +512,7 @@ export class BrijPartnerClient {
   }
 
   async getPartnerOrders(): Promise<Order[]> {
-    const response = await this._orderClient!.post("/v1/getPartnerOrders");
+    const response = await this._orderClient!.post("/v1/partner/getOrders");
 
     return Promise.all(
       response.data.orders.map(async (order: Order) => {
@@ -522,7 +550,7 @@ export class BrijPartnerClient {
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
     const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
 
-    await this._orderClient!.post("/v1/acceptOrder", {
+    await this._orderClient!.post("/v1/partner/acceptOrder", {
       orderId,
       bankName: encryptField(bankName),
       bankAccount: encryptField(bankAccount),
@@ -545,7 +573,7 @@ export class BrijPartnerClient {
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
     const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
 
-    await this._orderClient!.post("/v1/acceptOrder", {
+    await this._orderClient!.post("/v1/partner/acceptOrder", {
       orderId,
       cryptoWalletAddress,
       externalId,
@@ -554,7 +582,7 @@ export class BrijPartnerClient {
   }
 
   async completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void> {
-    await this._orderClient!.post("/v1/completeOrder", {
+    await this._orderClient!.post("/v1/partner/completeOrder", {
       orderId: orderId,
       transactionId: transactionId,
       externalId: externalId,
@@ -562,14 +590,14 @@ export class BrijPartnerClient {
   }
 
   async completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void> {
-    await this._orderClient!.post("/v1/completeOrder", {
+    await this._orderClient!.post("/v1/partner/completeOrder", {
       orderId: orderId,
       externalId: externalId,
     });
   }
 
   async failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void> {
-    await this._orderClient!.post("/v1/failOrder", {
+    await this._orderClient!.post("/v1/partner/failOrder", {
       orderId: orderId,
       reason: reason,
       externalId: externalId,
@@ -577,10 +605,14 @@ export class BrijPartnerClient {
   }
 
   async rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void> {
-    await this._orderClient!.post("/v1/rejectOrder", {
+    await this._orderClient!.post("/v1/partner/rejectOrder", {
       orderId: orderId,
       reason: reason,
     });
+  }
+
+  async updateFees(params: UpdateFeesParams): Promise<void> {
+    await this._orderClient!.post("/v1/partner/updateFees", params);
   }
 
   async getUserInfo(publicKey: string) {
@@ -668,6 +700,7 @@ export class BrijPartnerClient {
     SOL: 9,
     // Fiat currencies
     USD: 2,
+    EUR: 2,
     NGN: 2,
   };
 
