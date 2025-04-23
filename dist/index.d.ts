@@ -101,6 +101,7 @@ type Order = {
     userSignature?: string;
     partnerSignature?: string;
     userWalletAddress?: string;
+    walletPublicKey?: string;
 };
 type UpdateFeesParams = {
     onRampFee?: {

@@ -148,6 +148,7 @@ export type Order = {
   userSignature?: string;
   partnerSignature?: string;
   userWalletAddress?: string;
+  walletPublicKey?: string;
 };
 
 export type UpdateFeesParams = {
