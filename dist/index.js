@@ -1733,6 +1733,57 @@ const Phone = {
         return message;
     },
 };
+function createBaseCitizenship() {
+    return { value: "" };
+}
+const Citizenship = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.value !== "") {
+            writer.uint32(10).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCitizenship();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { value: isSet$1(object.value) ? globalThis.String(object.value) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return Citizenship.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseCitizenship();
+        message.value = object.value ?? "";
+        return message;
+    },
+};
 function bytesFromBase64$1(b64) {
     if (globalThis.Buffer) {
         return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
@@ -2301,6 +2352,14 @@ class BrijPartnerClient {
                         firstName: data.firstName,
                         lastName: data.lastName,
                         ...commonFields,
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_CITIZENSHIP: {
+                    const data = Citizenship.decode(decryptedData);
+                    userData.citizenship = {
+                        value: data.value,
+                        ...commonFields
                     };
                     break;
                 }

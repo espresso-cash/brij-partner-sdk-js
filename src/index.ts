@@ -7,6 +7,7 @@ import ed2curve from "ed2curve";
 import {
   BankInfo,
   BirthDate,
+  Citizenship,
   DataType,
   dataTypeFromJSON,
   Document,
@@ -367,6 +368,14 @@ export class BrijPartnerClient {
             firstName: data.firstName,
             lastName: data.lastName,
             ...commonFields,
+          };
+          break;
+        }
+        case DataType.DATA_TYPE_CITIZENSHIP: {
+          const data = Citizenship.decode(decryptedData);
+          userData.citizenship = {
+            value: data.value,
+            ...commonFields
           };
           break;
         }
