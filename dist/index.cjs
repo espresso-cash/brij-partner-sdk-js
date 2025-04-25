@@ -2282,12 +2282,27 @@ class BrijPartnerClient {
                 : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
-            const status = verificationData?.status ?? ValidationStatus.UNRECOGNIZED;
-            const commonFields = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
+            const commonFields = {
+                dataId,
+                hash: encrypted.hash
+            };
             switch (dataTypeFromJSON(encrypted.type)) {
                 case DataType.DATA_TYPE_EMAIL: {
                     const data = Email.decode(decryptedData);
-                    userData.email = { value: data.value, ...commonFields };
+                    userData.email = {
+                        value: data.value,
+                        ...commonFields,
+                        status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ValidationStatus.UNRECOGNIZED))
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_PHONE: {
+                    const data = Phone.decode(decryptedData);
+                    userData.phone = {
+                        value: data.value,
+                        ...commonFields,
+                        status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ValidationStatus.UNRECOGNIZED))
+                    };
                     break;
                 }
                 case DataType.DATA_TYPE_NAME: {
@@ -2301,12 +2316,10 @@ class BrijPartnerClient {
                 }
                 case DataType.DATA_TYPE_BIRTH_DATE: {
                     const data = BirthDate.decode(decryptedData);
-                    userData.birthDate = { value: new Date(data.value), ...commonFields };
-                    break;
-                }
-                case DataType.DATA_TYPE_PHONE: {
-                    const data = Phone.decode(decryptedData);
-                    userData.phone = { value: data.value, ...commonFields };
+                    userData.birthDate = {
+                        value: new Date(data.value ?? ""),
+                        ...commonFields
+                    };
                     break;
                 }
                 case DataType.DATA_TYPE_DOCUMENT: {
@@ -2325,29 +2338,26 @@ class BrijPartnerClient {
                         bankName: data.bankName,
                         accountNumber: data.accountNumber,
                         bankCode: data.bankCode,
+                        countryCode: data.countryCode,
                         ...commonFields,
                     });
                     break;
                 }
                 case DataType.DATA_TYPE_SELFIE_IMAGE: {
                     const data = SelfieImage.decode(decryptedData);
-                    userData.selfie = { value: data.value, ...commonFields };
+                    userData.selfie = {
+                        value: data.value,
+                        ...commonFields
+                    };
                     break;
                 }
             }
         }
-        userData.custom = Object.fromEntries(await Promise.all(responseData.customValidationData.map(async (data) => {
-            if (!data.encryptedValue) {
-                return [data.id, ""];
-            }
-            const decryptedValue = await this.decryptData(naclUtil__default.default.decodeBase64(data.encryptedValue), secret);
-            return [data.id, new TextDecoder().decode(decryptedValue)];
-        })));
         if (documentList.length > 0) {
-            userData.document = documentList;
+            userData.documents = documentList;
         }
         if (bankInfoList.length > 0) {
-            userData.bankInfo = bankInfoList;
+            userData.bankInfos = bankInfoList;
         }
         return userData;
     }

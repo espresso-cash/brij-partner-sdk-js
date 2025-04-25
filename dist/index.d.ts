@@ -42,31 +42,36 @@ type DataAccessParams = {
 };
 type UserDataField = {
     dataId: string;
-    status: ValidationStatus;
+    hash: string;
 };
 type UserDataValueField<T> = {
     value: T;
 } & UserDataField;
 type UserData = {
-    email?: UserDataValueField<string>;
-    phone?: UserDataValueField<string>;
+    email?: UserDataValueField<string> & {
+        status: ValidationStatus;
+    };
+    phone?: UserDataValueField<string> & {
+        status: ValidationStatus;
+    };
     name?: {
         firstName: string;
         lastName: string;
     } & UserDataField;
+    citizenship?: UserDataValueField<string>;
     birthDate?: UserDataValueField<Date>;
-    document?: ({
+    documents?: ({
         type: string;
         number: string;
         countryCode: string;
     } & UserDataField)[];
-    bankInfo?: ({
+    bankInfos?: ({
         bankName: string;
         accountNumber: string;
         bankCode: string;
+        countryCode: string;
     } & UserDataField)[];
     selfie?: UserDataValueField<Uint8Array>;
-    custom?: Record<string, string>;
 };
 declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",
