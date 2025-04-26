@@ -1743,6 +1743,57 @@ const Phone = {
         return message;
     },
 };
+function createBaseCitizenship() {
+    return { value: "" };
+}
+const Citizenship = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.value !== "") {
+            writer.uint32(10).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCitizenship();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { value: isSet$1(object.value) ? globalThis.String(object.value) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return Citizenship.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseCitizenship();
+        message.value = object.value ?? "";
+        return message;
+    },
+};
 function bytesFromBase64$1(b64) {
     if (globalThis.Buffer) {
         return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
@@ -2282,12 +2333,27 @@ class BrijPartnerClient {
                 : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
-            const status = verificationData?.status ?? ValidationStatus.UNRECOGNIZED;
-            const commonFields = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
+            const commonFields = {
+                dataId,
+                hash: encrypted.hash
+            };
             switch (dataTypeFromJSON(encrypted.type)) {
                 case DataType.DATA_TYPE_EMAIL: {
                     const data = Email.decode(decryptedData);
-                    userData.email = { value: data.value, ...commonFields };
+                    userData.email = {
+                        value: data.value,
+                        ...commonFields,
+                        status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ValidationStatus.UNRECOGNIZED))
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_PHONE: {
+                    const data = Phone.decode(decryptedData);
+                    userData.phone = {
+                        value: data.value,
+                        ...commonFields,
+                        status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ValidationStatus.UNRECOGNIZED))
+                    };
                     break;
                 }
                 case DataType.DATA_TYPE_NAME: {
@@ -2299,14 +2365,20 @@ class BrijPartnerClient {
                     };
                     break;
                 }
-                case DataType.DATA_TYPE_BIRTH_DATE: {
-                    const data = BirthDate.decode(decryptedData);
-                    userData.birthDate = { value: new Date(data.value), ...commonFields };
+                case DataType.DATA_TYPE_CITIZENSHIP: {
+                    const data = Citizenship.decode(decryptedData);
+                    userData.citizenship = {
+                        value: data.value,
+                        ...commonFields
+                    };
                     break;
                 }
-                case DataType.DATA_TYPE_PHONE: {
-                    const data = Phone.decode(decryptedData);
-                    userData.phone = { value: data.value, ...commonFields };
+                case DataType.DATA_TYPE_BIRTH_DATE: {
+                    const data = BirthDate.decode(decryptedData);
+                    userData.birthDate = {
+                        value: new Date(data.value ?? ""),
+                        ...commonFields
+                    };
                     break;
                 }
                 case DataType.DATA_TYPE_DOCUMENT: {
@@ -2325,29 +2397,26 @@ class BrijPartnerClient {
                         bankName: data.bankName,
                         accountNumber: data.accountNumber,
                         bankCode: data.bankCode,
+                        countryCode: data.countryCode,
                         ...commonFields,
                     });
                     break;
                 }
                 case DataType.DATA_TYPE_SELFIE_IMAGE: {
                     const data = SelfieImage.decode(decryptedData);
-                    userData.selfie = { value: data.value, ...commonFields };
+                    userData.selfie = {
+                        value: data.value,
+                        ...commonFields
+                    };
                     break;
                 }
             }
         }
-        userData.custom = Object.fromEntries(await Promise.all(responseData.customValidationData.map(async (data) => {
-            if (!data.encryptedValue) {
-                return [data.id, ""];
-            }
-            const decryptedValue = await this.decryptData(naclUtil__default.default.decodeBase64(data.encryptedValue), secret);
-            return [data.id, new TextDecoder().decode(decryptedValue)];
-        })));
         if (documentList.length > 0) {
-            userData.document = documentList;
+            userData.documents = documentList;
         }
         if (bankInfoList.length > 0) {
-            userData.bankInfo = bankInfoList;
+            userData.bankInfos = bankInfoList;
         }
         return userData;
     }

@@ -7,6 +7,7 @@ import ed2curve from "ed2curve";
 import {
   BankInfo,
   BirthDate,
+  Citizenship,
   DataType,
   dataTypeFromJSON,
   Document,
@@ -96,20 +97,20 @@ export type DataAccessParams = {
   includeValues?: boolean;
 };
 
-export type UserDataField = { dataId: string; status: ValidationStatus };
+export type UserDataField = { dataId: string; hash: string };
 
 export type UserDataValueField<T> = { value: T } & UserDataField;
 
 export type UserData = {
-  email?: UserDataValueField<string>;
-  phone?: UserDataValueField<string>;
+  email?: UserDataValueField<string> & { status: ValidationStatus };
+  phone?: UserDataValueField<string> & { status: ValidationStatus };
   name?: { firstName: string; lastName: string } & UserDataField;
+  citizenship?: UserDataValueField<string>;
   birthDate?: UserDataValueField<Date>;
-  document?: ({ type: string; number: string; countryCode: string } & UserDataField)[];
-  bankInfo?: ({ bankName: string; accountNumber: string; bankCode: string } & UserDataField)[];
+  documents?: ({ type: string; number: string; countryCode: string } & UserDataField)[];
+  bankInfos?: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[];
   selfie?: UserDataValueField<Uint8Array>;
-  custom?: Record<string, string>;
-};
+}
 
 type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
 
@@ -328,7 +329,7 @@ export class BrijPartnerClient {
     const secret = base58.decode(secretKey);
 
     const documentList: ({ type: string; number: string; countryCode: string } & UserDataField)[] = [];
-    const bankInfoList: ({ bankName: string; accountNumber: string; bankCode: string } & UserDataField)[] = [];
+    const bankInfoList: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[] = [];
 
     for (const encrypted of responseData.userData) {
       const decryptedData = encrypted.encryptedValue?.trim()
@@ -337,13 +338,28 @@ export class BrijPartnerClient {
 
       const dataId = encrypted.id;
       const verificationData = validationMap.get(dataId);
-      const status = verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED;
-      const commonFields: UserDataField = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
+      const commonFields: UserDataField = {
+        dataId,
+        hash: encrypted.hash
+      };
 
       switch (dataTypeFromJSON(encrypted.type)) {
         case DataType.DATA_TYPE_EMAIL: {
           const data = Email.decode(decryptedData);
-          userData.email = { value: data.value, ...commonFields };
+          userData.email = {
+            value: data.value,
+            ...commonFields,
+            status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED))
+          };
+          break;
+        }
+        case DataType.DATA_TYPE_PHONE: {
+          const data = Phone.decode(decryptedData);
+          userData.phone = {
+            value: data.value,
+            ...commonFields,
+            status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED))
+          };
           break;
         }
         case DataType.DATA_TYPE_NAME: {
@@ -355,14 +371,20 @@ export class BrijPartnerClient {
           };
           break;
         }
-        case DataType.DATA_TYPE_BIRTH_DATE: {
-          const data = BirthDate.decode(decryptedData);
-          userData.birthDate = { value: new Date(data.value!), ...commonFields };
+        case DataType.DATA_TYPE_CITIZENSHIP: {
+          const data = Citizenship.decode(decryptedData);
+          userData.citizenship = {
+            value: data.value,
+            ...commonFields
+          };
           break;
         }
-        case DataType.DATA_TYPE_PHONE: {
-          const data = Phone.decode(decryptedData);
-          userData.phone = { value: data.value, ...commonFields };
+        case DataType.DATA_TYPE_BIRTH_DATE: {
+          const data = BirthDate.decode(decryptedData);
+          userData.birthDate = {
+            value: new Date(data.value ?? ""),
+            ...commonFields
+          };
           break;
         }
         case DataType.DATA_TYPE_DOCUMENT: {
@@ -381,35 +403,27 @@ export class BrijPartnerClient {
             bankName: data.bankName,
             accountNumber: data.accountNumber,
             bankCode: data.bankCode,
+            countryCode: data.countryCode,
             ...commonFields,
           });
           break;
         }
         case DataType.DATA_TYPE_SELFIE_IMAGE: {
           const data = SelfieImage.decode(decryptedData);
-          userData.selfie = { value: data.value, ...commonFields };
+          userData.selfie = {
+            value: data.value,
+            ...commonFields
+          };
           break;
         }
       }
     }
 
-    userData.custom = Object.fromEntries(
-      await Promise.all(
-        responseData.customValidationData.map(async (data: any) => {
-          if (!data.encryptedValue) {
-            return [data.id, ""];
-          }
-          const decryptedValue = await this.decryptData(naclUtil.decodeBase64(data.encryptedValue), secret);
-          return [data.id, new TextDecoder().decode(decryptedValue)];
-        })
-      )
-    );
-
     if (documentList.length > 0) {
-      userData.document = documentList;
+      userData.documents = documentList;
     }
     if (bankInfoList.length > 0) {
-      userData.bankInfo = bankInfoList;
+      userData.bankInfos = bankInfoList;
     }
 
     return userData;
@@ -441,21 +455,21 @@ export class BrijPartnerClient {
       const userMessage =
         order.type === RampType.OnRamp
           ? this.createUserOnRampMessage({
-              cryptoAmount: order.cryptoAmount,
-              cryptoCurrency: order.cryptoCurrency,
-              fiatAmount: order.fiatAmount,
-              fiatCurrency: order.fiatCurrency,
-              cryptoWalletAddress: order.userWalletAddress ?? "",
-            })
+            cryptoAmount: order.cryptoAmount,
+            cryptoCurrency: order.cryptoCurrency,
+            fiatAmount: order.fiatAmount,
+            fiatCurrency: order.fiatCurrency,
+            cryptoWalletAddress: order.userWalletAddress ?? "",
+          })
           : this.createUserOffRampMessage({
-              cryptoAmount: order.cryptoAmount,
-              cryptoCurrency: order.cryptoCurrency,
-              fiatAmount: order.fiatAmount,
-              fiatCurrency: order.fiatCurrency,
-              bankName: decryptedOrder.bankName,
-              bankAccount: decryptedOrder.bankAccount,
-              cryptoWalletAddress: order.userWalletAddress ?? "",
-            });
+            cryptoAmount: order.cryptoAmount,
+            cryptoCurrency: order.cryptoCurrency,
+            fiatAmount: order.fiatAmount,
+            fiatCurrency: order.fiatCurrency,
+            bankName: decryptedOrder.bankName,
+            bankAccount: decryptedOrder.bankAccount,
+            cryptoWalletAddress: order.userWalletAddress ?? "",
+          });
 
       const isValidUserSig = nacl.sign.detached.verify(
         new TextEncoder().encode(userMessage),
@@ -473,20 +487,20 @@ export class BrijPartnerClient {
       const partnerMessage =
         order.type === RampType.OnRamp
           ? this.createPartnerOnRampMessage({
-              cryptoAmount: order.cryptoAmount,
-              cryptoCurrency: order.cryptoCurrency,
-              fiatAmount: order.fiatAmount,
-              fiatCurrency: order.fiatCurrency,
-              bankName: decryptedOrder.bankName,
-              bankAccount: decryptedOrder.bankAccount,
-            })
+            cryptoAmount: order.cryptoAmount,
+            cryptoCurrency: order.cryptoCurrency,
+            fiatAmount: order.fiatAmount,
+            fiatCurrency: order.fiatCurrency,
+            bankName: decryptedOrder.bankName,
+            bankAccount: decryptedOrder.bankAccount,
+          })
           : this.createPartnerOffRampMessage({
-              cryptoAmount: order.cryptoAmount,
-              cryptoCurrency: order.cryptoCurrency,
-              fiatAmount: order.fiatAmount,
-              fiatCurrency: order.fiatCurrency,
-              cryptoWalletAddress: order.cryptoWalletAddress,
-            });
+            cryptoAmount: order.cryptoAmount,
+            cryptoCurrency: order.cryptoCurrency,
+            fiatAmount: order.fiatAmount,
+            fiatCurrency: order.fiatCurrency,
+            cryptoWalletAddress: order.cryptoWalletAddress,
+          });
 
       const isValidPartnerSig = nacl.sign.detached.verify(
         new TextEncoder().encode(partnerMessage),
@@ -653,11 +667,11 @@ export class BrijPartnerClient {
       country: params.country,
       validatorPublicKey: this._verifierAuthPk,
     });
-  
+
     const buffer = response.data.data;
     const uint8Array = naclUtil.decodeBase64(buffer);
     const decoded = KycItemProto.decode(uint8Array);
-  
+
     const kycItem: KycItem = {
       countries: decoded.countries,
       status: toKycStatus(decoded.status),
@@ -671,7 +685,7 @@ export class BrijPartnerClient {
         ])
       )
     };
-  
+
     return {
       status: response.data.status,
       data: kycItem,
@@ -707,7 +721,7 @@ export class BrijPartnerClient {
 
   private convertToDecimalPrecision(amount: number, currency: string): string {
     const decimals = BrijPartnerClient.currencyDecimals[currency];
-    
+
     if (decimals === undefined) {
       throw new Error(`Unknown currency: ${currency}`);
     }
@@ -795,16 +809,16 @@ export class BrijPartnerClient {
 }
 
 function toKycStatus(protoStatus: number): KycStatus {
-    switch (protoStatus) {
-      case KycStatusProto.KYC_STATUS_UNSPECIFIED:
-        return KycStatus.Unspecified;
-      case KycStatusProto.KYC_STATUS_PENDING:
-        return KycStatus.Pending;
-      case KycStatusProto.KYC_STATUS_APPROVED:
-        return KycStatus.Approved;
-      case KycStatusProto.KYC_STATUS_REJECTED:
-        return KycStatus.Rejected;
-      default:
-        return KycStatus.Unspecified;
-    }
+  switch (protoStatus) {
+    case KycStatusProto.KYC_STATUS_UNSPECIFIED:
+      return KycStatus.Unspecified;
+    case KycStatusProto.KYC_STATUS_PENDING:
+      return KycStatus.Pending;
+    case KycStatusProto.KYC_STATUS_APPROVED:
+      return KycStatus.Approved;
+    case KycStatusProto.KYC_STATUS_REJECTED:
+      return KycStatus.Rejected;
+    default:
+      return KycStatus.Unspecified;
   }
+}
