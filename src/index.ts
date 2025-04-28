@@ -661,7 +661,7 @@ export class BrijPartnerClient {
     return base58.encode(decryptedSecretKey);
   }
 
-  async getKycStatusDetails(params: { userPK: string; country: string }): Promise<KycStatusDetails> {
+  async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<KycStatusDetails> {
     const response = await this._storageClient!.post("/v1/getKycStatus", {
       userPublicKey: params.userPK,
       country: params.country,
@@ -672,18 +672,30 @@ export class BrijPartnerClient {
     const uint8Array = naclUtil.decodeBase64(buffer);
     const decoded = KycItemProto.decode(uint8Array);
 
+    const secret = base58.decode(params.secretKey);
+
+    const decryptedAdditionalData = Object.fromEntries(
+      await Promise.all(
+        Object.entries(decoded.additionalData).map(async ([key, value]) => {
+          if (!value || value.length === 0) {
+            return [key, ""];
+          }
+
+          const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
+          const decryptedBytes = await this.decryptData(encryptedBytes, secret);
+          return [key, new TextDecoder().decode(decryptedBytes)];
+        })
+      )
+    );
+
+
     const kycItem: KycItem = {
       countries: decoded.countries,
       status: toKycStatus(decoded.status),
       provider: decoded.provider,
       userPublicKey: decoded.userPublicKey,
       hashes: decoded.hashes,
-      additionalData: Object.fromEntries(
-        Object.entries(decoded.additionalData).map(([key, value]) => [
-          key,
-          new TextDecoder().decode(value)
-        ])
-      )
+      additionalData: decryptedAdditionalData,
     };
 
     return {

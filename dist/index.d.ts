@@ -188,6 +188,7 @@ declare class BrijPartnerClient {
     getKycStatusDetails(params: {
         userPK: string;
         country: string;
+        secretKey: string;
     }): Promise<KycStatusDetails>;
     private decryptData;
     private static readonly currencyDecimals;
