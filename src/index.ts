@@ -308,7 +308,7 @@ export class BrijPartnerClient {
   }
 
   async getUserData({ userPK, secretKey, includeValues = true }: DataAccessParams): Promise<UserData> {
-    const response = await this._storageClient!.post("/v1/getUserData", {
+    const response = await this._storageClient!.post("/v1/partner/getUserData", {
       userPublicKey: userPK,
       includeValues,
     });
@@ -631,7 +631,7 @@ export class BrijPartnerClient {
   }
 
   async getUserInfo(publicKey: string) {
-    const response = await this._storageClient!.post("/v1/getInfo", {
+    const response = await this._storageClient!.post("/v1/partner/getInfo", {
       publicKey: publicKey,
     });
 
@@ -662,7 +662,7 @@ export class BrijPartnerClient {
   }
 
   async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<KycStatusDetails> {
-    const response = await this._storageClient!.post("/v1/getKycStatus", {
+    const response = await this._storageClient!.post("/v1/partner/getKycStatus", {
       userPublicKey: params.userPK,
       country: params.country,
       validatorPublicKey: this._verifierAuthPk,
