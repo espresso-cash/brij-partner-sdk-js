@@ -2310,7 +2310,7 @@ class BrijPartnerClient {
         return `${dataToSign}.${jose.base64url.encode(signature)}`;
     }
     async getUserData({ userPK, secretKey, includeValues = true }) {
-        const response = await this._storageClient.post("/v1/getUserData", {
+        const response = await this._storageClient.post("/v1/partner/getUserData", {
             userPublicKey: userPK,
             includeValues,
         });
@@ -2578,7 +2578,7 @@ class BrijPartnerClient {
         await this._orderClient.post("/v1/partner/updateFees", params);
     }
     async getUserInfo(publicKey) {
-        const response = await this._storageClient.post("/v1/getInfo", {
+        const response = await this._storageClient.post("/v1/partner/getInfo", {
             publicKey: publicKey,
         });
         return response.data;
@@ -2599,7 +2599,7 @@ class BrijPartnerClient {
         return base58__default.default.encode(decryptedSecretKey);
     }
     async getKycStatusDetails(params) {
-        const response = await this._storageClient.post("/v1/getKycStatus", {
+        const response = await this._storageClient.post("/v1/partner/getKycStatus", {
             userPublicKey: params.userPK,
             country: params.country,
             validatorPublicKey: this._verifierAuthPk,
