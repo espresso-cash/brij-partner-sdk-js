@@ -55,7 +55,7 @@ export function kycStatusToJSON(object: KycStatus): string {
 }
 
 export interface KycItem {
-  country: string;
+  countries: string[];
   status: KycStatus;
   provider: string;
   userPublicKey: string;
@@ -69,13 +69,13 @@ export interface KycItem_AdditionalDataEntry {
 }
 
 function createBaseKycItem(): KycItem {
-  return { country: "", status: 0, provider: "", userPublicKey: "", hashes: [], additionalData: {} };
+  return { countries: [], status: 0, provider: "", userPublicKey: "", hashes: [], additionalData: {} };
 }
 
 export const KycItem: MessageFns<KycItem> = {
   encode(message: KycItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.country !== "") {
-      writer.uint32(10).string(message.country);
+    for (const v of message.countries) {
+      writer.uint32(10).string(v!);
     }
     if (message.status !== 0) {
       writer.uint32(16).int32(message.status);
@@ -107,7 +107,7 @@ export const KycItem: MessageFns<KycItem> = {
             break;
           }
 
-          message.country = reader.string();
+          message.countries.push(reader.string());
           continue;
         }
         case 2: {
@@ -164,7 +164,9 @@ export const KycItem: MessageFns<KycItem> = {
 
   fromJSON(object: any): KycItem {
     return {
-      country: isSet(object.country) ? globalThis.String(object.country) : "",
+      countries: globalThis.Array.isArray(object?.countries)
+        ? object.countries.map((e: any) => globalThis.String(e))
+        : [],
       status: isSet(object.status) ? kycStatusFromJSON(object.status) : 0,
       provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
       userPublicKey: isSet(object.userPublicKey) ? globalThis.String(object.userPublicKey) : "",
@@ -180,8 +182,8 @@ export const KycItem: MessageFns<KycItem> = {
 
   toJSON(message: KycItem): unknown {
     const obj: any = {};
-    if (message.country !== "") {
-      obj.country = message.country;
+    if (message.countries?.length) {
+      obj.countries = message.countries;
     }
     if (message.status !== 0) {
       obj.status = kycStatusToJSON(message.status);
@@ -212,7 +214,7 @@ export const KycItem: MessageFns<KycItem> = {
   },
   fromPartial<I extends Exact<DeepPartial<KycItem>, I>>(object: I): KycItem {
     const message = createBaseKycItem();
-    message.country = object.country ?? "";
+    message.countries = object.countries?.map((e) => e) || [];
     message.status = object.status ?? 0;
     message.provider = object.provider ?? "";
     message.userPublicKey = object.userPublicKey ?? "";

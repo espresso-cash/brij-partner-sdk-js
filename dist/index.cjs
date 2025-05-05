@@ -1743,6 +1743,57 @@ const Phone = {
         return message;
     },
 };
+function createBaseCitizenship() {
+    return { value: "" };
+}
+const Citizenship = {
+    encode(message, writer = new BinaryWriter()) {
+        if (message.value !== "") {
+            writer.uint32(10).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCitizenship();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { value: isSet$1(object.value) ? globalThis.String(object.value) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return Citizenship.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseCitizenship();
+        message.value = object.value ?? "";
+        return message;
+    },
+};
 function bytesFromBase64$1(b64) {
     if (globalThis.Buffer) {
         return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
@@ -1878,12 +1929,12 @@ function kycStatusToJSON(object) {
     }
 }
 function createBaseKycItem() {
-    return { country: "", status: 0, provider: "", userPublicKey: "", hashes: [], additionalData: {} };
+    return { countries: [], status: 0, provider: "", userPublicKey: "", hashes: [], additionalData: {} };
 }
 const KycItem = {
     encode(message, writer = new BinaryWriter()) {
-        if (message.country !== "") {
-            writer.uint32(10).string(message.country);
+        for (const v of message.countries) {
+            writer.uint32(10).string(v);
         }
         if (message.status !== 0) {
             writer.uint32(16).int32(message.status);
@@ -1913,7 +1964,7 @@ const KycItem = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.country = reader.string();
+                    message.countries.push(reader.string());
                     continue;
                 }
                 case 2: {
@@ -1964,7 +2015,9 @@ const KycItem = {
     },
     fromJSON(object) {
         return {
-            country: isSet(object.country) ? globalThis.String(object.country) : "",
+            countries: globalThis.Array.isArray(object?.countries)
+                ? object.countries.map((e) => globalThis.String(e))
+                : [],
             status: isSet(object.status) ? kycStatusFromJSON(object.status) : 0,
             provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
             userPublicKey: isSet(object.userPublicKey) ? globalThis.String(object.userPublicKey) : "",
@@ -1979,8 +2032,8 @@ const KycItem = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.country !== "") {
-            obj.country = message.country;
+        if (message.countries?.length) {
+            obj.countries = message.countries;
         }
         if (message.status !== 0) {
             obj.status = kycStatusToJSON(message.status);
@@ -2010,7 +2063,7 @@ const KycItem = {
     },
     fromPartial(object) {
         const message = createBaseKycItem();
-        message.country = object.country ?? "";
+        message.countries = object.countries?.map((e) => e) || [];
         message.status = object.status ?? 0;
         message.provider = object.provider ?? "";
         message.userPublicKey = object.userPublicKey ?? "";
@@ -2151,6 +2204,12 @@ exports.ValidationStatus = void 0;
     ValidationStatus["Rejected"] = "REJECTED";
     ValidationStatus["Unverified"] = "UNVERIFIED";
 })(exports.ValidationStatus || (exports.ValidationStatus = {}));
+exports.RampType = void 0;
+(function (RampType) {
+    RampType["Unspecified"] = "RAMP_TYPE_UNSPECIFIED";
+    RampType["OnRamp"] = "RAMP_TYPE_ON_RAMP";
+    RampType["OffRamp"] = "RAMP_TYPE_OFF_RAMP";
+})(exports.RampType || (exports.RampType = {}));
 function toValidationStatus(protoStatus) {
     switch (protoStatus) {
         case ValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
@@ -2231,7 +2290,7 @@ class BrijPartnerClient {
             baseURL: this.storageBaseUrl,
             headers: { Authorization: `Bearer ${storageToken}` },
         });
-        const orderToken = await this.createToken(privateKeyBytes, "orders.espressocash.com");
+        const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
         this._orderClient = axios__default.default.create({
             baseURL: this.orderBaseUrl,
             headers: { Authorization: `Bearer ${orderToken}` },
@@ -2251,7 +2310,7 @@ class BrijPartnerClient {
         return `${dataToSign}.${jose.base64url.encode(signature)}`;
     }
     async getUserData({ userPK, secretKey, includeValues = true }) {
-        const response = await this._storageClient.post("/v1/getUserData", {
+        const response = await this._storageClient.post("/v1/partner/getUserData", {
             userPublicKey: userPK,
             includeValues,
         });
@@ -2274,12 +2333,27 @@ class BrijPartnerClient {
                 : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
-            const status = verificationData?.status ?? ValidationStatus.UNRECOGNIZED;
-            const commonFields = { dataId, status: toValidationStatus(validationStatusFromJSON(status)) };
+            const commonFields = {
+                dataId,
+                hash: encrypted.hash
+            };
             switch (dataTypeFromJSON(encrypted.type)) {
                 case DataType.DATA_TYPE_EMAIL: {
                     const data = Email.decode(decryptedData);
-                    userData.email = { value: data.value, ...commonFields };
+                    userData.email = {
+                        value: data.value,
+                        ...commonFields,
+                        status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ValidationStatus.UNRECOGNIZED))
+                    };
+                    break;
+                }
+                case DataType.DATA_TYPE_PHONE: {
+                    const data = Phone.decode(decryptedData);
+                    userData.phone = {
+                        value: data.value,
+                        ...commonFields,
+                        status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ValidationStatus.UNRECOGNIZED))
+                    };
                     break;
                 }
                 case DataType.DATA_TYPE_NAME: {
@@ -2291,14 +2365,20 @@ class BrijPartnerClient {
                     };
                     break;
                 }
-                case DataType.DATA_TYPE_BIRTH_DATE: {
-                    const data = BirthDate.decode(decryptedData);
-                    userData.birthDate = { value: new Date(data.value), ...commonFields };
+                case DataType.DATA_TYPE_CITIZENSHIP: {
+                    const data = Citizenship.decode(decryptedData);
+                    userData.citizenship = {
+                        value: data.value,
+                        ...commonFields
+                    };
                     break;
                 }
-                case DataType.DATA_TYPE_PHONE: {
-                    const data = Phone.decode(decryptedData);
-                    userData.phone = { value: data.value, ...commonFields };
+                case DataType.DATA_TYPE_BIRTH_DATE: {
+                    const data = BirthDate.decode(decryptedData);
+                    userData.birthDate = {
+                        value: new Date(data.value ?? ""),
+                        ...commonFields
+                    };
                     break;
                 }
                 case DataType.DATA_TYPE_DOCUMENT: {
@@ -2317,29 +2397,26 @@ class BrijPartnerClient {
                         bankName: data.bankName,
                         accountNumber: data.accountNumber,
                         bankCode: data.bankCode,
+                        countryCode: data.countryCode,
                         ...commonFields,
                     });
                     break;
                 }
                 case DataType.DATA_TYPE_SELFIE_IMAGE: {
                     const data = SelfieImage.decode(decryptedData);
-                    userData.selfie = { value: data.value, ...commonFields };
+                    userData.selfie = {
+                        value: data.value,
+                        ...commonFields
+                    };
                     break;
                 }
             }
         }
-        userData.custom = Object.fromEntries(await Promise.all(responseData.customValidationData.map(async (data) => {
-            if (!data.encryptedValue) {
-                return [data.id, ""];
-            }
-            const decryptedValue = await this.decryptData(naclUtil__default.default.decodeBase64(data.encryptedValue), secret);
-            return [data.id, new TextDecoder().decode(decryptedValue)];
-        })));
         if (documentList.length > 0) {
-            userData.document = documentList;
+            userData.documents = documentList;
         }
         if (bankInfoList.length > 0) {
-            userData.bankInfo = bankInfoList;
+            userData.bankInfos = bankInfoList;
         }
         return userData;
     }
@@ -2365,7 +2442,7 @@ class BrijPartnerClient {
         const decryptedOrder = await this.decryptOrderFields(order, secretKey);
         if (order.userSignature) {
             const userVerifyKey = base58__default.default.decode(order.userPublicKey);
-            const userMessage = order.type === "ON_RAMP"
+            const userMessage = order.type === exports.RampType.OnRamp
                 ? this.createUserOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
                     cryptoCurrency: order.cryptoCurrency,
@@ -2389,7 +2466,7 @@ class BrijPartnerClient {
         }
         if (order.partnerSignature) {
             const partnerVerifyKey = base58__default.default.decode(order.partnerPublicKey);
-            const partnerMessage = order.type === "ON_RAMP"
+            const partnerMessage = order.type === exports.RampType.OnRamp
                 ? this.createPartnerOnRampMessage({
                     cryptoAmount: order.cryptoAmount,
                     cryptoCurrency: order.cryptoCurrency,
@@ -2413,7 +2490,7 @@ class BrijPartnerClient {
         return decryptedOrder;
     }
     async getOrder({ externalId, orderId }) {
-        const response = await this._orderClient.post("/v1/getOrder", {
+        const response = await this._orderClient.post("/v1/partner/getOrder", {
             orderId,
             externalId,
         });
@@ -2421,7 +2498,7 @@ class BrijPartnerClient {
         return this.processOrder(response.data, base58__default.default.decode(secretKey));
     }
     async getPartnerOrders() {
-        const response = await this._orderClient.post("/v1/getPartnerOrders");
+        const response = await this._orderClient.post("/v1/partner/getOrders");
         return Promise.all(response.data.orders.map(async (order) => {
             const secretKey = await this.getUserSecretKey(order.userPublicKey);
             return this.processOrder(order, base58__default.default.decode(secretKey));
@@ -2445,7 +2522,7 @@ class BrijPartnerClient {
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
         const signature = nacl__default.default.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
-        await this._orderClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/partner/acceptOrder", {
             orderId,
             bankName: encryptField(bankName),
             bankAccount: encryptField(bankAccount),
@@ -2464,7 +2541,7 @@ class BrijPartnerClient {
         });
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
         const signature = nacl__default.default.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
-        await this._orderClient.post("/v1/acceptOrder", {
+        await this._orderClient.post("/v1/partner/acceptOrder", {
             orderId,
             cryptoWalletAddress,
             externalId,
@@ -2472,33 +2549,36 @@ class BrijPartnerClient {
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
-        await this._orderClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/partner/completeOrder", {
             orderId: orderId,
             transactionId: transactionId,
             externalId: externalId,
         });
     }
     async completeOffRampOrder({ orderId, externalId }) {
-        await this._orderClient.post("/v1/completeOrder", {
+        await this._orderClient.post("/v1/partner/completeOrder", {
             orderId: orderId,
             externalId: externalId,
         });
     }
     async failOrder({ orderId, reason, externalId }) {
-        await this._orderClient.post("/v1/failOrder", {
+        await this._orderClient.post("/v1/partner/failOrder", {
             orderId: orderId,
             reason: reason,
             externalId: externalId,
         });
     }
     async rejectOrder({ orderId, reason }) {
-        await this._orderClient.post("/v1/rejectOrder", {
+        await this._orderClient.post("/v1/partner/rejectOrder", {
             orderId: orderId,
             reason: reason,
         });
     }
+    async updateFees(params) {
+        await this._orderClient.post("/v1/partner/updateFees", params);
+    }
     async getUserInfo(publicKey) {
-        const response = await this._storageClient.post("/v1/getInfo", {
+        const response = await this._storageClient.post("/v1/partner/getInfo", {
             publicKey: publicKey,
         });
         return response.data;
@@ -2519,7 +2599,7 @@ class BrijPartnerClient {
         return base58__default.default.encode(decryptedSecretKey);
     }
     async getKycStatusDetails(params) {
-        const response = await this._storageClient.post("/v1/getKycStatus", {
+        const response = await this._storageClient.post("/v1/partner/getKycStatus", {
             userPublicKey: params.userPK,
             country: params.country,
             validatorPublicKey: this._verifierAuthPk,
@@ -2527,16 +2607,22 @@ class BrijPartnerClient {
         const buffer = response.data.data;
         const uint8Array = naclUtil__default.default.decodeBase64(buffer);
         const decoded = KycItem.decode(uint8Array);
+        const secret = base58__default.default.decode(params.secretKey);
+        const decryptedAdditionalData = Object.fromEntries(await Promise.all(Object.entries(decoded.additionalData).map(async ([key, value]) => {
+            if (!value || value.length === 0) {
+                return [key, ""];
+            }
+            const encryptedBytes = typeof value === "string" ? naclUtil__default.default.decodeBase64(value) : value;
+            const decryptedBytes = await this.decryptData(encryptedBytes, secret);
+            return [key, new TextDecoder().decode(decryptedBytes)];
+        })));
         const kycItem = {
-            country: decoded.country,
+            countries: decoded.countries,
             status: toKycStatus(decoded.status),
             provider: decoded.provider,
             userPublicKey: decoded.userPublicKey,
             hashes: decoded.hashes,
-            additionalData: Object.fromEntries(Object.entries(decoded.additionalData).map(([key, value]) => [
-                key,
-                new TextDecoder().decode(value)
-            ]))
+            additionalData: decryptedAdditionalData,
         };
         return {
             status: response.data.status,
@@ -2562,6 +2648,7 @@ class BrijPartnerClient {
         SOL: 9,
         // Fiat currencies
         USD: 2,
+        EUR: 2,
         NGN: 2,
     };
     convertToDecimalPrecision(amount, currency) {

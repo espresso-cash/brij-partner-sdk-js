@@ -45,31 +45,36 @@ type GenerateTransactionParams = OrderIds & {
 };
 type UserDataField = {
     dataId: string;
-    status: ValidationStatus;
+    hash: string;
 };
 type UserDataValueField<T> = {
     value: T;
 } & UserDataField;
 type UserData = {
-    email?: UserDataValueField<string>;
-    phone?: UserDataValueField<string>;
+    email?: UserDataValueField<string> & {
+        status: ValidationStatus;
+    };
+    phone?: UserDataValueField<string> & {
+        status: ValidationStatus;
+    };
     name?: {
         firstName: string;
         lastName: string;
     } & UserDataField;
+    citizenship?: UserDataValueField<string>;
     birthDate?: UserDataValueField<Date>;
-    document?: ({
+    documents?: ({
         type: string;
         number: string;
         countryCode: string;
     } & UserDataField)[];
-    bankInfo?: ({
+    bankInfos?: ({
         bankName: string;
         accountNumber: string;
         bankCode: string;
+        countryCode: string;
     } & UserDataField)[];
     selfie?: UserDataValueField<Uint8Array>;
-    custom?: Record<string, string>;
 };
 declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",
@@ -77,6 +82,11 @@ declare enum ValidationStatus {
     Approved = "APPROVED",
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
+}
+declare enum RampType {
+    Unspecified = "RAMP_TYPE_UNSPECIFIED",
+    OnRamp = "RAMP_TYPE_ON_RAMP",
+    OffRamp = "RAMP_TYPE_OFF_RAMP"
 }
 type Order = {
     orderId: string;
@@ -86,7 +96,7 @@ type Order = {
     partnerPublicKey: string;
     userPublicKey: string;
     comment: string;
-    type: "ON_RAMP" | "OFF_RAMP";
+    type: RampType;
     cryptoAmount: number;
     cryptoCurrency: string;
     fiatAmount: number;
@@ -99,6 +109,28 @@ type Order = {
     userSignature?: string;
     partnerSignature?: string;
     userWalletAddress?: string;
+    walletPublicKey?: string;
+};
+type UpdateFeesParams = {
+    onRampFee?: {
+        fixedFee: number;
+        percentageFee: number;
+        conversionRates: {
+            cryptoCurrency: string;
+            fiatCurrency: string;
+            rate: number;
+        };
+    };
+    offRampFee?: {
+        fixedFee: number;
+        percentageFee: number;
+        conversionRates: {
+            cryptoCurrency: string;
+            fiatCurrency: string;
+            rate: number;
+        };
+    };
+    walletAddress?: string;
 };
 declare enum KycStatus {
     Unspecified = "KYC_STATUS_UNSPECIFIED",
@@ -107,7 +139,7 @@ declare enum KycStatus {
     Rejected = "KYC_STATUS_REJECTED"
 }
 interface KycItem {
-    country: string;
+    countries: string[];
     status: KycStatus;
     provider: string;
     userPublicKey: string;
@@ -153,11 +185,13 @@ declare class BrijPartnerClient {
     completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void>;
     failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void>;
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
+    updateFees(params: UpdateFeesParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<any>;
     getUserSecretKey(publicKey: string): Promise<string>;
     getKycStatusDetails(params: {
         userPK: string;
         country: string;
+        secretKey: string;
     }): Promise<KycStatusDetails>;
     private decryptData;
     private static readonly currencyDecimals;
@@ -169,4 +203,4 @@ declare class BrijPartnerClient {
     generateTransaction({ orderId, externalId, fundingWalletAddress }: GenerateTransactionParams): Promise<string>;
 }
 
-export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type GenerateTransactionParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, type RejectOrderParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
+export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, RampType, type RejectOrderParams, type UpdateFeesParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
