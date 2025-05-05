@@ -822,7 +822,7 @@ export class BrijPartnerClient {
   }
 
   async generateTransaction({ orderId, externalId, fundingWalletAddress }: GenerateTransactionParams): Promise<string> {
-    const response = await this._orderClient!.post("/v1/generateTransaction", {
+    const response = await this._orderClient!.post("/v1/partner/generateTransaction", {
       orderId: orderId,
       externalId: externalId,
       fundingWalletAddress: fundingWalletAddress,

@@ -2669,7 +2669,7 @@ class BrijPartnerClient {
         return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
     }
     async generateTransaction({ orderId, externalId, fundingWalletAddress }) {
-        const response = await this._orderClient.post("/v1/generateTransaction", {
+        const response = await this._orderClient.post("/v1/partner/generateTransaction", {
             orderId: orderId,
             externalId: externalId,
             fundingWalletAddress: fundingWalletAddress,
