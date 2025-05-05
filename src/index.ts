@@ -101,6 +101,8 @@ export type UserDataField = { dataId: string; hash: string };
 
 export type UserDataValueField<T> = { value: T } & UserDataField;
 
+export type GenerateTransactionParams = OrderIds & { fundingWalletAddress: string };
+
 export type UserData = {
   email?: UserDataValueField<string> & { status: ValidationStatus };
   phone?: UserDataValueField<string> & { status: ValidationStatus };
@@ -817,6 +819,16 @@ export class BrijPartnerClient {
     const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
     const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
+  }
+
+  async generateTransaction({ orderId, externalId, fundingWalletAddress }: GenerateTransactionParams): Promise<string> {
+    const response = await this._orderClient!.post("/v1/partner/generateTransaction", {
+      orderId: orderId,
+      externalId: externalId,
+      fundingWalletAddress: fundingWalletAddress,
+    });
+
+    return response.data.transaction;
   }
 }
 

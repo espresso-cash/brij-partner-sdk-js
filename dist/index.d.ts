@@ -47,6 +47,9 @@ type UserDataField = {
 type UserDataValueField<T> = {
     value: T;
 } & UserDataField;
+type GenerateTransactionParams = OrderIds & {
+    fundingWalletAddress: string;
+};
 type UserData = {
     email?: UserDataValueField<string> & {
         status: ValidationStatus;
@@ -197,6 +200,7 @@ declare class BrijPartnerClient {
     private createUserOffRampMessage;
     private createPartnerOnRampMessage;
     private createPartnerOffRampMessage;
+    generateTransaction({ orderId, externalId, fundingWalletAddress }: GenerateTransactionParams): Promise<string>;
 }
 
-export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, RampType, type RejectOrderParams, type UpdateFeesParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
+export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type GenerateTransactionParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, RampType, type RejectOrderParams, type UpdateFeesParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
