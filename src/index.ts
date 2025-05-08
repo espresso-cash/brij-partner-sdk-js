@@ -455,6 +455,7 @@ export class BrijPartnerClient {
       const userMessage =
         order.type === RampType.OnRamp
           ? this.createUserOnRampMessage({
+            orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
             cryptoCurrency: order.cryptoCurrency,
             fiatAmount: order.fiatAmount,
@@ -462,12 +463,13 @@ export class BrijPartnerClient {
             cryptoWalletAddress: order.userWalletAddress ?? "",
           })
           : this.createUserOffRampMessage({
+            orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
             cryptoCurrency: order.cryptoCurrency,
             fiatAmount: order.fiatAmount,
             fiatCurrency: order.fiatCurrency,
-            bankName: decryptedOrder.bankName,
-            bankAccount: decryptedOrder.bankAccount,
+            encryptedBankName: order.bankName,
+            encryptedBankAccount: order.bankAccount,
             cryptoWalletAddress: order.userWalletAddress ?? "",
           });
 
@@ -487,14 +489,16 @@ export class BrijPartnerClient {
       const partnerMessage =
         order.type === RampType.OnRamp
           ? this.createPartnerOnRampMessage({
+            orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
             cryptoCurrency: order.cryptoCurrency,
             fiatAmount: order.fiatAmount,
             fiatCurrency: order.fiatCurrency,
-            bankName: decryptedOrder.bankName,
-            bankAccount: decryptedOrder.bankAccount,
+            encryptedBankName: order.bankName,
+            encryptedBankAccount: order.bankAccount,
           })
           : this.createPartnerOffRampMessage({
+            orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
             cryptoCurrency: order.cryptoCurrency,
             fiatAmount: order.fiatAmount,
@@ -553,13 +557,17 @@ export class BrijPartnerClient {
       return naclUtil.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
     };
 
+    const encryptedBankName = encryptField(bankName);
+    const encryptedBankAccount = encryptField(bankAccount);
+
     const signatureMessage = this.createPartnerOnRampMessage({
+      orderId: order.orderId,
       cryptoAmount: order.cryptoAmount,
       cryptoCurrency: order.cryptoCurrency,
       fiatAmount: order.fiatAmount,
       fiatCurrency: order.fiatCurrency,
-      bankName,
-      bankAccount,
+      encryptedBankName: encryptedBankName,
+      encryptedBankAccount: encryptedBankAccount,
     });
 
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
@@ -567,8 +575,8 @@ export class BrijPartnerClient {
 
     await this._orderClient!.post("/v1/partner/acceptOrder", {
       orderId,
-      bankName: encryptField(bankName),
-      bankAccount: encryptField(bankAccount),
+      bankName: encryptedBankName,
+      bankAccount: encryptedBankAccount,
       externalId,
       partnerSignature: base58.encode(signature),
     });
@@ -578,6 +586,7 @@ export class BrijPartnerClient {
     const order = await this.getOrder({ orderId });
 
     const signatureMessage = this.createPartnerOffRampMessage({
+      orderId: order.orderId,
       cryptoAmount: order.cryptoAmount,
       cryptoCurrency: order.cryptoCurrency,
       fiatAmount: order.fiatAmount,
@@ -742,12 +751,14 @@ export class BrijPartnerClient {
   }
 
   private createUserOnRampMessage({
+    orderId,
     cryptoAmount,
     cryptoCurrency,
     fiatAmount,
     fiatCurrency,
     cryptoWalletAddress,
   }: {
+    orderId: string;
     cryptoAmount: number;
     cryptoCurrency: string;
     fiatAmount: number;
@@ -756,58 +767,64 @@ export class BrijPartnerClient {
   }): string {
     const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
     const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
+    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 
   private createUserOffRampMessage({
+    orderId,
     cryptoAmount,
     cryptoCurrency,
     fiatAmount,
     fiatCurrency,
-    bankName,
-    bankAccount,
+    encryptedBankName,
+    encryptedBankAccount,
     cryptoWalletAddress,
   }: {
+    orderId: string;
     cryptoAmount: number;
     cryptoCurrency: string;
     fiatAmount: number;
     fiatCurrency: string;
-    bankName: string;
-    bankAccount: string;
+    encryptedBankName: string;
+    encryptedBankAccount: string;
     cryptoWalletAddress: string;
   }): string {
     const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
     const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}|${cryptoWalletAddress}`;
+    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}|${cryptoWalletAddress}`;
   }
 
   private createPartnerOnRampMessage({
+    orderId,
     cryptoAmount,
     cryptoCurrency,
     fiatAmount,
     fiatCurrency,
-    bankName,
-    bankAccount,
+    encryptedBankName,
+    encryptedBankAccount,
   }: {
+    orderId: string;
     cryptoAmount: number;
     cryptoCurrency: string;
     fiatAmount: number;
     fiatCurrency: string;
-    bankName: string;
-    bankAccount: string;
+    encryptedBankName: string;
+    encryptedBankAccount: string;
   }): string {
     const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
     const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${bankName}|${bankAccount}`;
+    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}`;
   }
 
   private createPartnerOffRampMessage({
+    orderId,
     cryptoAmount,
     cryptoCurrency,
     fiatAmount,
     fiatCurrency,
     cryptoWalletAddress,
   }: {
+    orderId: string;
     cryptoAmount: number;
     cryptoCurrency: string;
     fiatAmount: number;
@@ -816,7 +833,7 @@ export class BrijPartnerClient {
   }): string {
     const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
     const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
+    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 }
 
