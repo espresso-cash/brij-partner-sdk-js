@@ -30,7 +30,6 @@
     "@connectrpc/connect": "^2.0.2",
     "@connectrpc/connect-web": "^2.0.2",
     "axios": "^1.7.5",
-    "brij_protos_js": "https://gitpkg.vercel.app/espresso-cash/protos/brij_protos_js?v0.12.0",
     "bs58": "^6.0.0",
     "ed2curve": "^0.3.0",
     "jose": "^5.8.0",
