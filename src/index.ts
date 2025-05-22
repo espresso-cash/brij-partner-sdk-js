@@ -1,10 +1,13 @@
 import { base64url } from "jose";
 import nacl from "tweetnacl";
+import { createClient } from "@connectrpc/connect";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
 import { AppConfig } from "./config/config";
 import { createTransport } from "./grpc/transport";
+import { PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
+import { PartnerService as OrderService } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -163,14 +166,14 @@ export class BrijPartnerClient {
   private readonly storageBaseUrl: string;
   private readonly orderBaseUrl: string;
   private _authPublicKey: string;
-  private _storageClient: AxiosInstance | null;
-  private _orderClient: AxiosInstance | null;
+  private _storageClient: ReturnType<typeof createClient<typeof PartnerService>> | null;
+  private _orderClient: ReturnType<typeof createClient<typeof OrderService>> | null;
   private readonly _verifierAuthPk: string;
 
   private constructor({ authKeyPair, appConfig = AppConfig.demo() }: BrijPartnerClientOptions) {
     this.authKeyPair = authKeyPair;
-    this.storageBaseUrl = appConfig.storageBaseUrl;
-    this.orderBaseUrl = appConfig.orderBaseUrl;
+    this.storageBaseUrl = appConfig.storageGrpcBaseUrl;
+    this.orderBaseUrl = appConfig.orderGrpcBaseUrl;
     this._verifierAuthPk = appConfig.verifierAuthPk;
     this._authPublicKey = "";
     this._storageClient = null;
@@ -223,12 +226,12 @@ export class BrijPartnerClient {
     this._authPublicKey = base58.encode(publicKeyBytes);
 
     const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
-
     const storageTransport = createTransport(this.storageBaseUrl, storageToken);
+    this._storageClient = createClient(PartnerService, storageTransport);
 
     const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
-
     const orderTransport = createTransport(this.orderBaseUrl, orderToken);
+    this._orderClient = createClient(OrderService, orderTransport);
   }
 
   private async createToken(privateKeyBytes: Uint8Array, audience: string): Promise<string> {
