@@ -29,6 +29,7 @@
     "@bufbuild/protobuf": "^2.2.0",
     "@connectrpc/connect": "^2.0.2",
     "@connectrpc/connect-web": "^2.0.2",
+    "brij-protos": "file:./brij_protos_js",
     "axios": "^1.7.5",
     "bs58": "^6.0.0",
     "ed2curve": "^0.3.0",

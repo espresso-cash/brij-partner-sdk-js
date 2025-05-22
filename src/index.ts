@@ -1,68 +1,15 @@
 import { base64url } from "jose";
-import axios, { AxiosInstance } from "axios";
 import nacl from "tweetnacl";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import {
-  BankInfo,
-  BirthDate,
-  Citizenship,
-  DataType,
-  dataTypeFromJSON,
-  Document,
-  documentTypeToJSON,
-  Email,
-  Name,
-  Phone,
-  SelfieImage,
-} from "./generated/protos/data.js";
-import {
-  ValidationStatus as ProtoValidationStatus,
-  validationStatusFromJSON,
-} from "./generated/protos/validation_status.js";
-import {
-  KycItem as KycItemProto,
-  KycStatus as KycStatusProto,
-} from "./generated/protos/kyc_item.js";
-
+import { AppConfig } from "./config/config";
+import { createTransport } from "./grpc/transport";
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
 
   getPublicKeyBytes(): Promise<Uint8Array>;
-}
-
-export class AppConfig {
-  readonly storageBaseUrl: string;
-  readonly orderBaseUrl: string;
-  readonly verifierAuthPk: string;
-
-  private constructor(storageBaseUrl: string, orderBaseUrl: string, verifierAuthPk: string) {
-    this.storageBaseUrl = storageBaseUrl;
-    this.orderBaseUrl = orderBaseUrl;
-    this.verifierAuthPk = verifierAuthPk;
-  }
-
-  static demo() {
-    return new AppConfig(
-      "https://storage-demo.brij.fi/",
-      "https://orders-demo.brij.fi/",
-      "HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E"
-    );
-  }
-
-  static production() {
-    return new AppConfig(
-      "https://storage.brij.fi/",
-      "https://orders.brij.fi/",
-      "88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ"
-    );
-  }
-
-  static custom(storageBaseUrl: string, orderBaseUrl: string, verifierAuthPk: string) {
-    return new AppConfig(storageBaseUrl, orderBaseUrl, verifierAuthPk);
-  }
 }
 
 interface BrijPartnerClientOptions {
@@ -277,17 +224,11 @@ export class BrijPartnerClient {
 
     const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
 
-    this._storageClient = axios.create({
-      baseURL: this.storageBaseUrl,
-      headers: { Authorization: `Bearer ${storageToken}` },
-    });
+    const storageTransport = createTransport(this.storageBaseUrl, storageToken);
 
     const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
 
-    this._orderClient = axios.create({
-      baseURL: this.orderBaseUrl,
-      headers: { Authorization: `Bearer ${orderToken}` },
-    });
+    const orderTransport = createTransport(this.orderBaseUrl, orderToken);
   }
 
   private async createToken(privateKeyBytes: Uint8Array, audience: string): Promise<string> {
