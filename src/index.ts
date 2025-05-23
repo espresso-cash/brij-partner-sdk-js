@@ -4,8 +4,8 @@ import { createClient } from "@connectrpc/connect";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
-import { create } from "@bufbuild/protobuf";
 import { AppConfig } from "./config/config";
+import * as protobuf from "@bufbuild/protobuf";
 import { createTransport } from "./grpc/transport";
 import { GetKycStatusResponse, PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { GetOrderResponse, PartnerService as OrderService } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
@@ -25,9 +25,8 @@ import {
   DocumentSchema,
   BankInfoSchema,
   SelfieImageSchema,
+  DocumentType,
 } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
-
-import { TimestampSchema } from 'brij_protos_js/gen/google/protobuf/timestamp_pb';
 
 import {
   ValidationStatus as ProtoValidationStatus,
@@ -89,7 +88,7 @@ export type UserData = {
   name?: { firstName: string; lastName: string } & UserDataField;
   citizenship?: UserDataValueField<string>;
   birthDate?: UserDataValueField<Date>;
-  documents?: ({ type: string; number: string; countryCode: string } & UserDataField)[];
+  documents?: ({ type: DocumentType | string; number: string; countryCode: string } & UserDataField)[];
   bankInfos?: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[];
   selfie?: UserDataValueField<Uint8Array>;
 }
@@ -229,7 +228,7 @@ export class BrijPartnerClient {
     const userData: UserData = {};
     const secret = base58.decode(secretKey);
 
-    const documentList: ({ type: string; number: string; countryCode: string } & UserDataField)[] = [];
+    const documentList: ({ type: DocumentType; number: string; countryCode: string } & UserDataField)[] = [];
     const bankInfoList: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[] = [];
 
     for (const encrypted of response.userData) {
@@ -246,7 +245,7 @@ export class BrijPartnerClient {
 
       switch (encrypted.type) {
         case DataType.EMAIL: {
-          const data = create(EmailSchema, { value: new TextDecoder().decode(decryptedData) });
+          const data = protobuf.fromBinary(EmailSchema, decryptedData);
           userData.email = {
             value: data.value,
             ...commonFields,
@@ -255,7 +254,7 @@ export class BrijPartnerClient {
           break;
         }
         case DataType.PHONE: {
-          const data = create(PhoneSchema, { value: new TextDecoder().decode(decryptedData) });
+          const data = protobuf.fromBinary(PhoneSchema, decryptedData);
           userData.phone = {
             value: data.value,
             ...commonFields,
@@ -264,7 +263,7 @@ export class BrijPartnerClient {
           break;
         }
         case DataType.NAME: {
-          const data = create(NameSchema, { firstName: new TextDecoder().decode(decryptedData) });
+          const data = protobuf.fromBinary(NameSchema, decryptedData);
           userData.name = {
             firstName: data.firstName,
             lastName: data.lastName,
@@ -273,7 +272,7 @@ export class BrijPartnerClient {
           break;
         }
         case DataType.CITIZENSHIP: {
-          const data = create(CitizenshipSchema, { value: new TextDecoder().decode(decryptedData) });
+          const data = protobuf.fromBinary(CitizenshipSchema, decryptedData);
           userData.citizenship = {
             value: data.value,
             ...commonFields
@@ -281,31 +280,25 @@ export class BrijPartnerClient {
           break;
         }
         case DataType.BIRTH_DATE: {
-          const date = new Date(new TextDecoder().decode(decryptedData));
-          const timestamp = create(TimestampSchema, {
-            seconds: BigInt(Math.floor(date.getTime() / 1000)),
-            nanos: (date.getTime() % 1000) * 1_000_000
-          });
-          const data = create(BirthDateSchema, { value: timestamp });
+          const data = protobuf.fromBinary(BirthDateSchema, decryptedData);
           userData.birthDate = {
-            value: data.value ? new Date(data.value.seconds.toString()) : new Date(),
+            value: data.value ? new Date(Number(data.value.seconds) * 1000 + Number(data.value.nanos) / 1_000_000) : new Date(),
             ...commonFields
           };
           break;
         }
         case DataType.DOCUMENT: {
-          // TODO: Implement this
-          // const data = create(DocumentSchema, { type: encrypted.type, number: new TextDecoder().decode(decryptedData) });
-          // documentList.push({
-          //   type: documentTypeToJSON(data.type),
-          //   number: data.number,
-          //   countryCode: data.countryCode,
-          //   ...commonFields,
-          // });
+          const data = protobuf.fromBinary(DocumentSchema, decryptedData);
+          documentList.push({
+            type: data.type,
+            number: data.number,
+            countryCode: data.countryCode,
+            ...commonFields,
+          });
           break;
         }
         case DataType.BANK_INFO: {
-          const data = create(BankInfoSchema, { bankName: new TextDecoder().decode(decryptedData) });
+          const data = protobuf.fromBinary(BankInfoSchema, decryptedData);
           bankInfoList.push({
             bankName: data.bankName,
             accountNumber: data.accountNumber,
@@ -316,7 +309,7 @@ export class BrijPartnerClient {
           break;
         }
         case DataType.SELFIE_IMAGE: {
-          const data = create(SelfieImageSchema, { value: decryptedData });
+          const data = protobuf.fromBinary(SelfieImageSchema, decryptedData);
           userData.selfie = {
             value: data.value,
             ...commonFields
@@ -714,3 +707,5 @@ export class BrijPartnerClient {
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 }
+
+export { AppConfig };
