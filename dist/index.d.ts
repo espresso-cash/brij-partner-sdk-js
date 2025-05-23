@@ -1,5 +1,6 @@
 import * as brij_protos_js_gen_brij_storage_v1_partner_service_pb from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { GetOrderResponse } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
+import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 import { ValidationStatus } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
 
 declare class AppConfig {
@@ -74,7 +75,7 @@ type UserData = {
     citizenship?: UserDataValueField<string>;
     birthDate?: UserDataValueField<Date>;
     documents?: ({
-        type: string;
+        type: DocumentType | string;
         number: string;
         countryCode: string;
     } & UserDataField)[];
@@ -151,5 +152,5 @@ declare class BrijPartnerClient {
     private createPartnerOffRampMessage;
 }
 
-export { BrijPartnerClient };
+export { AppConfig, BrijPartnerClient };
 export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField };
