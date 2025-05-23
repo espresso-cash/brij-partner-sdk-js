@@ -3,13 +3,21 @@ import { GetOrderResponse } from 'brij_protos_js/gen/brij/orders/v1/partner/part
 import { ValidationStatus } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
 
 declare class AppConfig {
+    readonly storageBaseUrl: string;
+    readonly orderBaseUrl: string;
     readonly storageGrpcBaseUrl: string;
     readonly orderGrpcBaseUrl: string;
     readonly verifierAuthPk: string;
     private constructor();
     static demo(): AppConfig;
     static production(): AppConfig;
-    static custom(storageGrpcBaseUrl: string, orderGrpcBaseUrl: string, verifierAuthPk: string): AppConfig;
+    static custom({ storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk, }: {
+        storageBaseUrl: string;
+        orderBaseUrl: string;
+        storageGrpcBaseUrl: string;
+        orderGrpcBaseUrl: string;
+        verifierAuthPk: string;
+    }): AppConfig;
 }
 
 type OrderIds = {

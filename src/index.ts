@@ -183,6 +183,7 @@ export class BrijPartnerClient {
     this._authPublicKey = base58.encode(publicKeyBytes);
 
     const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
+
     const storageTransport = createTransport(this.storageBaseUrl, storageToken);
     this._storageClient = createClient(PartnerService, storageTransport);
 

@@ -4,6 +4,11 @@ import base58 from 'bs58';
 import naclUtil from 'tweetnacl-util';
 import ed2curve from 'ed2curve';
 import { create as create$1, fromBinary as fromBinary$1, toBinary, toJsonString, fromJsonString } from '@bufbuild/protobuf';
+import * as zlib from 'zlib';
+import { promisify } from 'util';
+import * as http2 from 'http2';
+import * as http from 'http';
+import * as https from 'https';
 
 // Copyright 2021-2025 The Connect Authors
 //
@@ -2808,62 +2813,44 @@ const compressedFlag = 0b00000001;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /**
- * Create a WHATWG ReadableStream of enveloped messages from a ReadableStream
- * of bytes.
+ * Compress an EnvelopedMessage.
  *
- * Ideally, this would simply be a TransformStream, but ReadableStream.pipeThrough
- * does not have the necessary availability at this time.
+ * Raises Internal if an enveloped message is already compressed.
  *
  * @private Internal code, does not follow semantic versioning.
  */
-function createEnvelopeReadableStream(stream) {
-    let reader;
-    let buffer = new Uint8Array(0);
-    function append(chunk) {
-        const n = new Uint8Array(buffer.length + chunk.length);
-        n.set(buffer);
-        n.set(chunk, buffer.length);
-        buffer = n;
+async function envelopeCompress(envelope, compression, compressMinBytes) {
+    let { flags, data } = envelope;
+    if ((flags & compressedFlag) === compressedFlag) {
+        throw new ConnectError("invalid envelope, already compressed", Code.Internal);
     }
-    return new ReadableStream({
-        start() {
-            reader = stream.getReader();
-        },
-        async pull(controller) {
-            let header = undefined;
-            for (;;) {
-                if (header === undefined && buffer.byteLength >= 5) {
-                    let length = 0;
-                    for (let i = 1; i < 5; i++) {
-                        length = (length << 8) + buffer[i];
-                    }
-                    header = { flags: buffer[0], length };
-                }
-                if (header !== undefined && buffer.byteLength >= header.length + 5) {
-                    break;
-                }
-                const result = await reader.read();
-                if (result.done) {
-                    break;
-                }
-                append(result.value);
-            }
-            if (header === undefined) {
-                if (buffer.byteLength == 0) {
-                    controller.close();
-                    return;
-                }
-                controller.error(new ConnectError("premature end of stream", Code.DataLoss));
-                return;
-            }
-            const data = buffer.subarray(5, 5 + header.length);
-            buffer = buffer.subarray(5 + header.length);
-            controller.enqueue({
-                flags: header.flags,
-                data,
-            });
-        },
-    });
+    if (compression && data.byteLength >= compressMinBytes) {
+        data = await compression.compress(data);
+        flags = flags | compressedFlag;
+    }
+    return { data, flags };
+}
+/**
+ * Decompress an EnvelopedMessage.
+ *
+ * Raises InvalidArgument if an envelope is compressed, but compression is null.
+ *
+ * Relies on the provided Compression to raise ResourceExhausted if the
+ * *decompressed* message size is larger than readMaxBytes. If the envelope is
+ * not compressed, readMaxBytes is not honored.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+async function envelopeDecompress(envelope, compression, readMaxBytes) {
+    let { flags, data } = envelope;
+    if ((flags & compressedFlag) === compressedFlag) {
+        if (!compression) {
+            throw new ConnectError("received compressed envelope, but do not know how to decompress", Code.Internal);
+        }
+        data = await compression.decompress(data, readMaxBytes);
+        flags = flags ^ compressedFlag;
+    }
+    return { data, flags };
 }
 /**
  * Encode a single enveloped message.
@@ -2892,7 +2879,81 @@ function encodeEnvelope(flags, data) {
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-var __asyncValues$1 = (undefined && undefined.__asyncValues) || function (o) {
+/**
+ * At most, allow ~4GiB to be received or sent per message.
+ * zlib used by Node.js caps maxOutputLength at this value. It also happens to
+ * be the maximum theoretical message size supported by protobuf-es.
+ */
+const maxReadMaxBytes = 0xffffffff;
+const maxWriteMaxBytes = maxReadMaxBytes;
+/**
+ * The default value for the compressMinBytes option. The CPU cost of compressing
+ * very small messages usually isn't worth the small reduction in network I/O, so
+ * the default value is 1 kibibyte.
+ */
+const defaultCompressMinBytes = 1024;
+/**
+ * Asserts that the options writeMaxBytes, readMaxBytes, and compressMinBytes
+ * are within sane limits, and returns default values where no value is
+ * provided.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function validateReadWriteMaxBytes(readMaxBytes, writeMaxBytes, compressMinBytes) {
+    writeMaxBytes !== null && writeMaxBytes !== void 0 ? writeMaxBytes : (writeMaxBytes = maxWriteMaxBytes);
+    readMaxBytes !== null && readMaxBytes !== void 0 ? readMaxBytes : (readMaxBytes = maxReadMaxBytes);
+    compressMinBytes !== null && compressMinBytes !== void 0 ? compressMinBytes : (compressMinBytes = defaultCompressMinBytes);
+    if (writeMaxBytes < 1 || writeMaxBytes > maxWriteMaxBytes) {
+        throw new ConnectError(`writeMaxBytes ${writeMaxBytes} must be >= 1 and <= ${maxWriteMaxBytes}`, Code.Internal);
+    }
+    if (readMaxBytes < 1 || readMaxBytes > maxReadMaxBytes) {
+        throw new ConnectError(`readMaxBytes ${readMaxBytes} must be >= 1 and <= ${maxReadMaxBytes}`, Code.Internal);
+    }
+    return {
+        readMaxBytes,
+        writeMaxBytes,
+        compressMinBytes,
+    };
+}
+/**
+ * Raise an error ResourceExhausted if more than writeMaxByte are written.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function assertWriteMaxBytes(writeMaxBytes, bytesWritten) {
+    if (bytesWritten > writeMaxBytes) {
+        throw new ConnectError(`message size ${bytesWritten} is larger than configured writeMaxBytes ${writeMaxBytes}`, Code.ResourceExhausted);
+    }
+}
+/**
+ * Raise an error ResourceExhausted if more than readMaxBytes are read.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function assertReadMaxBytes(readMaxBytes, bytesRead, totalSizeKnown = false) {
+    if (bytesRead > readMaxBytes) {
+        let message = `message size is larger than configured readMaxBytes ${readMaxBytes}`;
+        if (totalSizeKnown) {
+            message = `message size ${bytesRead} is larger than configured readMaxBytes ${readMaxBytes}`;
+        }
+        throw new ConnectError(message, Code.ResourceExhausted);
+    }
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+var __asyncValues$2 = (undefined && undefined.__asyncValues) || function (o) {
     if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
     var m = o[Symbol.asyncIterator], i;
     return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
@@ -2912,11 +2973,397 @@ var __asyncGenerator$2 = (undefined && undefined.__asyncGenerator) || function (
     function reject(value) { resume("throw", value); }
     function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
 };
-var __asyncDelegator$1 = (undefined && undefined.__asyncDelegator) || function (o) {
+var __asyncDelegator$2 = (undefined && undefined.__asyncDelegator) || function (o) {
     var i, p;
     return i = {}, verb("next"), verb("throw", function (e) { throw e; }), verb("return"), i[Symbol.iterator] = function () { return this; }, i;
     function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await$2(o[n](v)), done: false } : f ? f(v) : v; } : f; }
 };
+function pipeTo(source, ...rest) {
+    const [transforms, sink, opt] = pickTransformsAndSink(rest);
+    let iterable = source;
+    let abortable;
+    if ((opt === null || opt === void 0 ? void 0 : opt.propagateDownStreamError) === true) {
+        iterable = abortable = makeIterableAbortable(iterable);
+    }
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    iterable = pipe(iterable, ...transforms, { propagateDownStreamError: false });
+    return sink(iterable).catch((reason) => {
+        if (abortable) {
+            return abortable.abort(reason).then(() => Promise.reject(reason));
+        }
+        return Promise.reject(reason);
+    });
+}
+// pick transforms, the sink, and options from the pipeTo() rest parameter
+function pickTransformsAndSink(rest) {
+    let opt;
+    if (typeof rest[rest.length - 1] != "function") {
+        opt = rest.pop();
+    }
+    const sink = rest.pop();
+    return [rest, sink, opt];
+}
+function pipe(source, ...rest) {
+    return __asyncGenerator$2(this, arguments, function* pipe_1() {
+        var _a;
+        const [transforms, opt] = pickTransforms(rest);
+        let abortable;
+        const sourceIt = source[Symbol.asyncIterator]();
+        const cachedSource = {
+            [Symbol.asyncIterator]() {
+                return sourceIt;
+            },
+        };
+        let iterable = cachedSource;
+        if ((opt === null || opt === void 0 ? void 0 : opt.propagateDownStreamError) === true) {
+            iterable = abortable = makeIterableAbortable(iterable);
+        }
+        for (const t of transforms) {
+            iterable = t(iterable);
+        }
+        const it = iterable[Symbol.asyncIterator]();
+        try {
+            for (;;) {
+                const r = yield __await$2(it.next());
+                if (r.done === true) {
+                    break;
+                }
+                if (!abortable) {
+                    yield yield __await$2(r.value);
+                    continue;
+                }
+                try {
+                    yield yield __await$2(r.value);
+                }
+                catch (e) {
+                    yield __await$2(abortable.abort(e)); // propagate downstream error to the source
+                    throw e;
+                }
+            }
+        }
+        finally {
+            if ((opt === null || opt === void 0 ? void 0 : opt.propagateDownStreamError) === true) {
+                // Call return on the source iterable to indicate
+                // that we will no longer consume it and it should
+                // cleanup any allocated resources.
+                (_a = sourceIt.return) === null || _a === void 0 ? void 0 : _a.call(sourceIt).catch(() => {
+                    // return returns a promise, which we don't care about.
+                    //
+                    // Uncaught promises are thrown at sometime/somewhere by the event loop,
+                    // this is to ensure error is caught and ignored.
+                });
+            }
+        }
+    });
+}
+function pickTransforms(rest) {
+    let opt;
+    if (typeof rest[rest.length - 1] != "function") {
+        opt = rest.pop();
+    }
+    return [rest, opt];
+}
+function transformSerializeEnvelope(serialization, endStreamFlag, endSerialization) {
+    {
+        return function (iterable) {
+            return __asyncGenerator$2(this, arguments, function* () {
+                var _a, e_4, _b, _c;
+                try {
+                    for (var _d = true, iterable_4 = __asyncValues$2(iterable), iterable_4_1; iterable_4_1 = yield __await$2(iterable_4.next()), _a = iterable_4_1.done, !_a; _d = true) {
+                        _c = iterable_4_1.value;
+                        _d = false;
+                        const chunk = _c;
+                        const data = serialization.serialize(chunk);
+                        yield yield __await$2({ flags: 0, data });
+                    }
+                }
+                catch (e_4_1) { e_4 = { error: e_4_1 }; }
+                finally {
+                    try {
+                        if (!_d && !_a && (_b = iterable_4.return)) yield __await$2(_b.call(iterable_4));
+                    }
+                    finally { if (e_4) throw e_4.error; }
+                }
+            });
+        };
+    }
+}
+function transformParseEnvelope(serialization, endStreamFlag, endSerialization) {
+    // code path always yields T
+    return function (iterable) {
+        return __asyncGenerator$2(this, arguments, function* () {
+            var _a, e_7, _b, _c;
+            try {
+                for (var _d = true, iterable_7 = __asyncValues$2(iterable), iterable_7_1; iterable_7_1 = yield __await$2(iterable_7.next()), _a = iterable_7_1.done, !_a; _d = true) {
+                    _c = iterable_7_1.value;
+                    _d = false;
+                    const { flags, data } = _c;
+                    if (endStreamFlag !== undefined &&
+                        (flags & endStreamFlag) === endStreamFlag) ;
+                    yield yield __await$2(serialization.parse(data));
+                }
+            }
+            catch (e_7_1) { e_7 = { error: e_7_1 }; }
+            finally {
+                try {
+                    if (!_d && !_a && (_b = iterable_7.return)) yield __await$2(_b.call(iterable_7));
+                }
+                finally { if (e_7) throw e_7.error; }
+            }
+        });
+    };
+}
+/**
+ * Creates an AsyncIterableTransform that takes enveloped messages as a source,
+ * and compresses them if they are larger than compressMinBytes.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function transformCompressEnvelope(compression, compressMinBytes) {
+    return function (iterable) {
+        return __asyncGenerator$2(this, arguments, function* () {
+            var _a, e_8, _b, _c;
+            try {
+                for (var _d = true, iterable_8 = __asyncValues$2(iterable), iterable_8_1; iterable_8_1 = yield __await$2(iterable_8.next()), _a = iterable_8_1.done, !_a; _d = true) {
+                    _c = iterable_8_1.value;
+                    _d = false;
+                    const env = _c;
+                    yield yield __await$2(yield __await$2(envelopeCompress(env, compression, compressMinBytes)));
+                }
+            }
+            catch (e_8_1) { e_8 = { error: e_8_1 }; }
+            finally {
+                try {
+                    if (!_d && !_a && (_b = iterable_8.return)) yield __await$2(_b.call(iterable_8));
+                }
+                finally { if (e_8) throw e_8.error; }
+            }
+        });
+    };
+}
+/**
+ * Creates an AsyncIterableTransform that takes enveloped messages as a source,
+ * and decompresses them using the given compression.
+ *
+ * The iterable raises an error if the decompressed payload of an enveloped
+ * message is larger than readMaxBytes, or if no compression is provided.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function transformDecompressEnvelope(compression, readMaxBytes) {
+    return function (iterable) {
+        return __asyncGenerator$2(this, arguments, function* () {
+            var _a, e_9, _b, _c;
+            try {
+                for (var _d = true, iterable_9 = __asyncValues$2(iterable), iterable_9_1; iterable_9_1 = yield __await$2(iterable_9.next()), _a = iterable_9_1.done, !_a; _d = true) {
+                    _c = iterable_9_1.value;
+                    _d = false;
+                    const env = _c;
+                    yield yield __await$2(yield __await$2(envelopeDecompress(env, compression, readMaxBytes)));
+                }
+            }
+            catch (e_9_1) { e_9 = { error: e_9_1 }; }
+            finally {
+                try {
+                    if (!_d && !_a && (_b = iterable_9.return)) yield __await$2(_b.call(iterable_9));
+                }
+                finally { if (e_9) throw e_9.error; }
+            }
+        });
+    };
+}
+/**
+ * Create an AsyncIterableTransform that takes enveloped messages as a source,
+ * and joins them into a stream of raw bytes.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function transformJoinEnvelopes() {
+    return function (iterable) {
+        return __asyncGenerator$2(this, arguments, function* () {
+            var _a, e_10, _b, _c;
+            try {
+                for (var _d = true, iterable_10 = __asyncValues$2(iterable), iterable_10_1; iterable_10_1 = yield __await$2(iterable_10.next()), _a = iterable_10_1.done, !_a; _d = true) {
+                    _c = iterable_10_1.value;
+                    _d = false;
+                    const { flags, data } = _c;
+                    yield yield __await$2(encodeEnvelope(flags, data));
+                }
+            }
+            catch (e_10_1) { e_10 = { error: e_10_1 }; }
+            finally {
+                try {
+                    if (!_d && !_a && (_b = iterable_10.return)) yield __await$2(_b.call(iterable_10));
+                }
+                finally { if (e_10) throw e_10.error; }
+            }
+        });
+    };
+}
+/**
+ * Create an AsyncIterableTransform that takes raw bytes as a source, and splits
+ * them into enveloped messages.
+ *
+ * The iterable raises an error
+ * - if the payload of an enveloped message is larger than readMaxBytes,
+ * - if the stream ended before an enveloped message fully arrived,
+ * - or if the stream ended with extraneous data.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function transformSplitEnvelope(readMaxBytes) {
+    // append chunk to buffer, returning updated buffer
+    function append(buffer, chunk) {
+        const n = new Uint8Array(buffer.byteLength + chunk.byteLength);
+        n.set(buffer);
+        n.set(chunk, buffer.length);
+        return n;
+    }
+    // tuple 0: envelope, or undefined if incomplete
+    // tuple 1: remainder of the buffer
+    function shiftEnvelope(buffer, header) {
+        if (buffer.byteLength < 5 + header.length) {
+            return [undefined, buffer];
+        }
+        return [
+            { flags: header.flags, data: buffer.subarray(5, 5 + header.length) },
+            buffer.subarray(5 + header.length),
+        ];
+    }
+    // undefined: header is incomplete
+    function peekHeader(buffer) {
+        if (buffer.byteLength < 5) {
+            return undefined;
+        }
+        const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        const length = view.getUint32(1); // 4 bytes message length
+        const flags = view.getUint8(0); // first byte is flags
+        return { length, flags };
+    }
+    return function (iterable) {
+        return __asyncGenerator$2(this, arguments, function* () {
+            var _a, e_11, _b, _c;
+            let buffer = new Uint8Array(0);
+            try {
+                for (var _d = true, iterable_11 = __asyncValues$2(iterable), iterable_11_1; iterable_11_1 = yield __await$2(iterable_11.next()), _a = iterable_11_1.done, !_a; _d = true) {
+                    _c = iterable_11_1.value;
+                    _d = false;
+                    const chunk = _c;
+                    buffer = append(buffer, chunk);
+                    for (;;) {
+                        const header = peekHeader(buffer);
+                        if (!header) {
+                            break;
+                        }
+                        assertReadMaxBytes(readMaxBytes, header.length, true);
+                        let env;
+                        [env, buffer] = shiftEnvelope(buffer, header);
+                        if (!env) {
+                            break;
+                        }
+                        yield yield __await$2(env);
+                    }
+                }
+            }
+            catch (e_11_1) { e_11 = { error: e_11_1 }; }
+            finally {
+                try {
+                    if (!_d && !_a && (_b = iterable_11.return)) yield __await$2(_b.call(iterable_11));
+                }
+                finally { if (e_11) throw e_11.error; }
+            }
+            if (buffer.byteLength > 0) {
+                const header = peekHeader(buffer);
+                let message = "protocol error: incomplete envelope";
+                if (header) {
+                    message = `protocol error: promised ${header.length} bytes in enveloped message, got ${buffer.byteLength - 5} bytes`;
+                }
+                throw new ConnectError(message, Code.InvalidArgument);
+            }
+        });
+    };
+}
+/**
+ * Wrap the given iterable and return an iterable with an abort() method.
+ *
+ * This function exists purely for convenience. Where one would typically have
+ * to access the iterator directly, advance through all elements, and call
+ * AsyncIterator.throw() to notify the upstream iterable, this function allows
+ * to use convenient for-await loops and still notify the upstream iterable:
+ *
+ * ```ts
+ * const abortable = makeIterableAbortable(iterable);
+ * for await (const ele of abortable) {
+ *   await abortable.abort("ERR");
+ * }
+ * ```
+ * There are a couple of limitations of this function:
+ * - the given async iterable must implement throw
+ * - the async iterable cannot be re-use
+ * - if source catches errors and yields values for them, they are ignored, and
+ *   the source may still dangle
+ *
+ * There are four possible ways an async function* can handle yield errors:
+ * 1. don't catch errors at all - Abortable.abort() will resolve "rethrown"
+ * 2. catch errors and rethrow - Abortable.abort() will resolve "rethrown"
+ * 3. catch errors and return - Abortable.abort() will resolve "completed"
+ * 4. catch errors and yield a value - Abortable.abort() will resolve "caught"
+ *
+ * Note that catching errors and yielding a value is problematic, and it should
+ * be documented that this may leave the source in a dangling state.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function makeIterableAbortable(iterable) {
+    const innerCandidate = iterable[Symbol.asyncIterator]();
+    if (innerCandidate.throw === undefined) {
+        throw new Error("AsyncIterable does not implement throw");
+    }
+    const inner = innerCandidate;
+    let aborted;
+    let resultPromise;
+    let it = {
+        next() {
+            resultPromise = inner.next().finally(() => {
+                resultPromise = undefined;
+            });
+            return resultPromise;
+        },
+        throw(e) {
+            return inner.throw(e);
+        },
+    };
+    if (innerCandidate.return !== undefined) {
+        it = Object.assign(Object.assign({}, it), { return(value) {
+                return inner.return(value);
+            } });
+    }
+    let used = false;
+    return {
+        abort(reason) {
+            if (aborted) {
+                return aborted.state;
+            }
+            const f = () => {
+                return inner.throw(reason).then((r) => (r.done === true ? "completed" : "caught"), () => "rethrown");
+            };
+            if (resultPromise) {
+                aborted = { reason, state: resultPromise.then(f, f) };
+                return aborted.state;
+            }
+            aborted = { reason, state: f() };
+            return aborted.state;
+        },
+        [Symbol.asyncIterator]() {
+            if (used) {
+                throw new Error("AsyncIterable cannot be re-used");
+            }
+            used = true;
+            return it;
+        },
+    };
+}
 /**
  * Create an asynchronous iterable from an array.
  *
@@ -2925,7 +3372,7 @@ var __asyncDelegator$1 = (undefined && undefined.__asyncDelegator) || function (
 // eslint-disable-next-line @typescript-eslint/require-await
 function createAsyncIterable(items) {
     return __asyncGenerator$2(this, arguments, function* createAsyncIterable_1() {
-        yield __await$2(yield* __asyncDelegator$1(__asyncValues$1(items)));
+        yield __await$2(yield* __asyncDelegator$2(__asyncValues$2(items)));
     });
 }
 
@@ -2942,7 +3389,7 @@ function createAsyncIterable(items) {
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-var __asyncValues = (undefined && undefined.__asyncValues) || function (o) {
+var __asyncValues$1 = (undefined && undefined.__asyncValues) || function (o) {
     if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
     var m = o[Symbol.asyncIterator], i;
     return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
@@ -2950,7 +3397,7 @@ var __asyncValues = (undefined && undefined.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 var __await$1 = (undefined && undefined.__await) || function (v) { return this instanceof __await$1 ? (this.v = v, this) : new __await$1(v); };
-var __asyncDelegator = (undefined && undefined.__asyncDelegator) || function (o) {
+var __asyncDelegator$1 = (undefined && undefined.__asyncDelegator) || function (o) {
     var i, p;
     return i = {}, verb("next"), verb("throw", function (e) { throw e; }), verb("return"), i[Symbol.iterator] = function () { return this; }, i;
     function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await$1(o[n](v)), done: false } : f ? f(v) : v; } : f; }
@@ -3010,7 +3457,7 @@ function createClientStreamingFn(transport, method) {
         let singleMessage;
         let count = 0;
         try {
-            for (var _f = true, _g = __asyncValues(response.message), _h; _h = await _g.next(), _a = _h.done, !_a; _f = true) {
+            for (var _f = true, _g = __asyncValues$1(response.message), _h; _h = await _g.next(), _a = _h.done, !_a; _f = true) {
                 _c = _h.value;
                 _f = false;
                 const message = _c;
@@ -3046,7 +3493,7 @@ function handleStreamResponse(stream, options) {
             var _a, _b;
             const response = yield __await$1(stream);
             (_a = options === null || options === void 0 ? void 0 : options.onHeader) === null || _a === void 0 ? void 0 : _a.call(options, response.header);
-            yield __await$1(yield* __asyncDelegator(__asyncValues(response.message)));
+            yield __await$1(yield* __asyncDelegator$1(__asyncValues$1(response.message)));
             (_b = options === null || options === void 0 ? void 0 : options.onTrailer) === null || _b === void 0 ? void 0 : _b.call(options, response.trailer);
         });
     })()[Symbol.asyncIterator]();
@@ -3198,112 +3645,16 @@ function createContextValues() {
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /**
- * trailerFlag indicates that the data in a EnvelopedMessage
- * is a set of trailers of the gRPC-web protocol.
- *
- * @private Internal code, does not follow semantic versioning.
- */
-const trailerFlag = 0b10000000;
-/**
- * Parse a gRPC-web trailer, a set of header fields separated by CRLF.
- *
- * @private Internal code, does not follow semantic versioning.
- */
-function trailerParse(data) {
-    const headers = new Headers();
-    const lines = new TextDecoder().decode(data).split("\r\n");
-    for (const line of lines) {
-        if (line === "") {
-            continue;
-        }
-        const i = line.indexOf(":");
-        if (i > 0) {
-            const name = line.substring(0, i).trim();
-            const value = line.substring(i + 1).trim();
-            headers.append(name, value);
-        }
-    }
-    return headers;
-}
-
-// Copyright 2021-2025 The Connect Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-/**
  * @private Internal code, does not follow semantic versioning.
  */
 const headerContentType = "Content-Type";
+const headerEncoding = "Grpc-Encoding";
+const headerAcceptEncoding = "Grpc-Accept-Encoding";
 const headerTimeout = "Grpc-Timeout";
 const headerGrpcStatus = "Grpc-Status";
 const headerGrpcMessage = "Grpc-Message";
 const headerStatusDetailsBin = "Grpc-Status-Details-Bin";
 const headerUserAgent = "User-Agent";
-
-// Copyright 2021-2025 The Connect Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-/**
- * @private Internal code, does not follow semantic versioning.
- */
-/**
- * gRPC-web does not use the standard header User-Agent.
- *
- * @private Internal code, does not follow semantic versioning.
- */
-const headerXUserAgent = "X-User-Agent";
-/**
- * The canonical grpc/grpc-web JavaScript implementation sets
- * this request header with value "1".
- * Some servers may rely on the header to identify gRPC-web
- * requests. For example the proxy by improbable:
- * https://github.com/improbable-eng/grpc-web/blob/53aaf4cdc0fede7103c1b06f0cfc560c003a5c41/go/grpcweb/wrapper.go#L231
- *
- * @private Internal code, does not follow semantic versioning.
- */
-const headerXGrpcWeb = "X-Grpc-Web";
-
-// Copyright 2021-2025 The Connect Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-/**
- * Regular Expression that matches any valid gRPC-web Content-Type header value.
- * Note that this includes application/grpc-web-text with the additional base64
- * encoding.
- *
- * @private Internal code, does not follow semantic versioning.
- */
-const contentTypeProto = "application/grpc-web+proto";
-const contentTypeJson = "application/grpc-web+json";
 
 // Copyright 2021-2025 Buf Technologies, Inc.
 //
@@ -5311,19 +5662,42 @@ function getJsonOptions(options) {
     return o;
 }
 /**
- * Returns functions to normalize and serialize the input message
- * of an RPC, and to parse the output message of an RPC.
+ * Create an object that provides convenient access to request and response
+ * message serialization for a given method.
  *
  * @private Internal code, does not follow semantic versioning.
  */
-function createClientMethodSerializers(method, useBinaryFormat, jsonOptions, binaryOptions) {
-    const input = useBinaryFormat
-        ? createBinarySerialization(method.input, binaryOptions)
-        : createJsonSerialization(method.input, jsonOptions);
-    const output = useBinaryFormat
-        ? createBinarySerialization(method.output, binaryOptions)
-        : createJsonSerialization(method.output, jsonOptions);
-    return { parse: output.parse, serialize: input.serialize };
+function createMethodSerializationLookup(method, binaryOptions, jsonOptions, limitOptions) {
+    const inputBinary = limitSerialization(createBinarySerialization(method.input, binaryOptions), limitOptions);
+    const inputJson = limitSerialization(createJsonSerialization(method.input, jsonOptions), limitOptions);
+    const outputBinary = limitSerialization(createBinarySerialization(method.output, binaryOptions), limitOptions);
+    const outputJson = limitSerialization(createJsonSerialization(method.output, jsonOptions), limitOptions);
+    return {
+        getI(useBinaryFormat) {
+            return useBinaryFormat ? inputBinary : inputJson;
+        },
+        getO(useBinaryFormat) {
+            return useBinaryFormat ? outputBinary : outputJson;
+        },
+    };
+}
+/**
+ * Apply I/O limits to a Serialization object, returning a new object.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function limitSerialization(serialization, limitOptions) {
+    return {
+        serialize(data) {
+            const bytes = serialization.serialize(data);
+            assertWriteMaxBytes(limitOptions.writeMaxBytes, bytes.byteLength);
+            return bytes;
+        },
+        parse(data) {
+            assertReadMaxBytes(limitOptions.readMaxBytes, data.byteLength, true);
+            return serialization.parse(data);
+        },
+    };
 }
 /**
  * Creates a Serialization object for serializing the given protobuf message
@@ -5382,6 +5756,41 @@ function createJsonSerialization(desc, options) {
             }
         },
     };
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Regular Expression that matches any valid gRPC Content-Type header value.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+const contentTypeRegExp = /^application\/grpc(?:\+(?:(json)(?:; ?charset=utf-?8)?|proto))?$/i;
+const contentTypeProto = "application/grpc+proto";
+const contentTypeJson = "application/grpc+json";
+/**
+ * Parse a gRPC Content-Type header.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function parseContentType(contentType) {
+    const match = contentType === null || contentType === void 0 ? void 0 : contentType.match(contentTypeRegExp);
+    if (!match) {
+        return undefined;
+    }
+    const binary = !match[1];
+    return { binary };
 }
 
 // Copyright 2021-2025 The Connect Authors
@@ -5497,47 +5906,26 @@ function setupSignal(opt) {
 }
 
 class AppConfig {
+    storageBaseUrl;
+    orderBaseUrl;
     storageGrpcBaseUrl;
     orderGrpcBaseUrl;
     verifierAuthPk;
-    constructor(storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk) {
+    constructor(storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk) {
+        this.storageBaseUrl = storageBaseUrl;
+        this.orderBaseUrl = orderBaseUrl;
         this.storageGrpcBaseUrl = storageGrpcBaseUrl;
         this.orderGrpcBaseUrl = orderGrpcBaseUrl;
         this.verifierAuthPk = verifierAuthPk;
     }
     static demo() {
-        return new AppConfig("https://storage-grpc-demo.brij.fi", "https://orders-grpc-demo.brij.fi", "HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E");
+        return new AppConfig('https://storage-demo.brij.fi/', 'https://orders-demo.brij.fi/', 'https://storage-grpc-demo.brij.fi', 'https://orders-grpc-demo.brij.fi', 'HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E');
     }
     static production() {
-        return new AppConfig("https://storage-grpc.brij.fi", "https://orders-grpc.brij.fi", "88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ");
+        return new AppConfig('https://storage.brij.fi/', 'https://orders.brij.fi/', 'https://storage-grpc.brij.fi', 'https://orders-grpc.brij.fi', '88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ');
     }
-    static custom(storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk) {
-        return new AppConfig(storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk);
-    }
-}
-
-// Copyright 2021-2025 The Connect Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-/**
- * Asserts that the fetch API is available.
- */
-function assertFetchApi() {
-    try {
-        new Headers();
-    }
-    catch (_) {
-        throw new Error("connect-web requires the fetch API. Are you running on an old version of Node.js? Node.js is not supported in Connect for Web - please stay tuned for Connect for Node.");
+    static custom({ storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk, }) {
+        return new AppConfig(storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk);
     }
 }
 
@@ -5577,46 +5965,6 @@ function validateTrailer(trailer, header) {
     if (!header.has(headerGrpcStatus) && !trailer.has(headerGrpcStatus)) {
         throw new ConnectError("protocol error: missing status", Code.Internal);
     }
-}
-
-// Copyright 2021-2025 The Connect Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-/**
- * Creates headers for a gRPC-web request.
- *
- * @private Internal code, does not follow semantic versioning.
- */
-function requestHeader(useBinaryFormat, timeoutMs, userProvidedHeaders, setUserAgent) {
-    const result = new Headers(userProvidedHeaders !== null && userProvidedHeaders !== void 0 ? userProvidedHeaders : {});
-    // Note that we do not support the grpc-web-text format.
-    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md#protocol-differences-vs-grpc-over-http2
-    result.set(headerContentType, useBinaryFormat ? contentTypeProto : contentTypeJson);
-    result.set(headerXGrpcWeb, "1");
-    // Note that we do not strictly comply with gRPC user agents.
-    // We use "connect-es/1.2.3" where gRPC would use "grpc-es/1.2.3".
-    // See https://github.com/grpc/grpc/blob/c462bb8d485fc1434ecfae438823ca8d14cf3154/doc/PROTOCOL-HTTP2.md#user-agents
-    let userAgent = "connect-es/2.0.2";
-    userAgent = result.has(headerUserAgent)
-        ? result.get(headerUserAgent)
-        : result.has(headerXUserAgent)
-            ? result.get(headerXUserAgent)
-            : userAgent;
-    result.set(headerXUserAgent, userAgent);
-    if (timeoutMs !== undefined) {
-        result.set(headerTimeout, `${timeoutMs}m`);
-    }
-    return result;
 }
 
 // Copyright 2021-2025 The Connect Authors
@@ -5676,28 +6024,41 @@ function codeFromHttpStatus(httpStatus) {
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /**
- * Validates response status and header for the gRPC-web protocol.
- *
- * Throws a ConnectError if the header contains an error status,
- * or if the HTTP status indicates an error.
- *
- * Returns an object that indicates whether a gRPC status was found
- * in the response header. In this case, clients can not expect a
- * trailer.
+ * Creates headers for a gRPC request.
  *
  * @private Internal code, does not follow semantic versioning.
  */
-function validateResponse(status, headers) {
-    var _a;
-    // For compatibility with the `grpc-web` package, we treat all HTTP status
-    // codes in the 200 range as valid, not just HTTP 200.
-    if (status >= 200 && status < 300) {
-        return {
-            foundStatus: headers.has(headerGrpcStatus),
-            headerError: findTrailerError(headers),
-        };
+function requestHeader(useBinaryFormat, timeoutMs, userProvidedHeaders) {
+    const result = new Headers(userProvidedHeaders !== null && userProvidedHeaders !== void 0 ? userProvidedHeaders : {});
+    result.set(headerContentType, useBinaryFormat ? contentTypeProto : contentTypeJson);
+    if (!result.has(headerUserAgent)) {
+        // Note that we do not strictly comply with gRPC user agents.
+        // We use "connect-es/1.2.3" where gRPC would use "grpc-es/1.2.3".
+        // See https://github.com/grpc/grpc/blob/c462bb8d485fc1434ecfae438823ca8d14cf3154/doc/PROTOCOL-HTTP2.md#user-agents
+        result.set(headerUserAgent, "connect-es/2.0.2");
     }
-    throw new ConnectError(decodeURIComponent((_a = headers.get(headerGrpcMessage)) !== null && _a !== void 0 ? _a : `HTTP ${status}`), codeFromHttpStatus(status), headers);
+    if (timeoutMs !== undefined) {
+        result.set(headerTimeout, `${timeoutMs}m`);
+    }
+    // The gRPC-HTTP2 specification requires this - it flushes out proxies that
+    // don't support HTTP trailers.
+    result.set("Te", "trailers");
+    return result;
+}
+/**
+ * Creates headers for a gRPC request with compression.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function requestHeaderWithCompression(useBinaryFormat, timeoutMs, userProvidedHeaders, acceptCompression, sendCompression) {
+    const result = requestHeader(useBinaryFormat, timeoutMs, userProvidedHeaders);
+    if (sendCompression != null) {
+        result.set(headerEncoding, sendCompression.name);
+    }
+    if (acceptCompression.length > 0) {
+        result.set(headerAcceptEncoding, acceptCompression.map((c) => c.name).join(","));
+    }
+    return result;
 }
 
 // Copyright 2021-2025 The Connect Authors
@@ -5713,7 +6074,85 @@ function validateResponse(status, headers) {
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+/**
+ * Validates response status and header for the gRPC protocol.
+ * Throws a ConnectError if the header contains an error status,
+ * or if the HTTP status indicates an error.
+ *
+ * Returns an object that indicates whether a gRPC status was found
+ * in the response header. In this case, clients can not expect a
+ * trailer.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function validateResponse(status, headers) {
+    if (status != 200) {
+        throw new ConnectError(`HTTP ${status}`, codeFromHttpStatus(status), headers);
+    }
+    const mimeType = headers.get(headerContentType);
+    const parsedType = parseContentType(mimeType);
+    if (parsedType == undefined) {
+        throw new ConnectError(`unsupported content type ${mimeType}`, Code.Unknown);
+    }
+    return {
+        foundStatus: headers.has(headerGrpcStatus),
+        headerError: findTrailerError(headers),
+    };
+}
+/**
+ * Validates response status and header for the gRPC protocol.
+ * This function is identical to validateResponse(), but also verifies
+ * that a given encoding header is acceptable.
+ *
+ * Returns an object with the response compression, and a boolean
+ * indicating whether a gRPC status was found in the response header
+ * (in this case, clients can not expect a trailer).
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function validateResponseWithCompression(acceptCompression, status, headers) {
+    const { foundStatus, headerError } = validateResponse(status, headers);
+    let compression;
+    const encoding = headers.get(headerEncoding);
+    if (encoding !== null && encoding.toLowerCase() !== "identity") {
+        compression = acceptCompression.find((c) => c.name === encoding);
+        if (!compression) {
+            throw new ConnectError(`unsupported response encoding "${encoding}"`, Code.Internal, headers);
+        }
+    }
+    return {
+        foundStatus,
+        compression,
+        headerError,
+    };
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+var __asyncValues = (undefined && undefined.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 var __await = (undefined && undefined.__await) || function (v) { return this instanceof __await ? (this.v = v, this) : new __await(v); };
+var __asyncDelegator = (undefined && undefined.__asyncDelegator) || function (o) {
+    var i, p;
+    return i = {}, verb("next"), verb("throw", function (e) { throw e; }), verb("return"), i[Symbol.iterator] = function () { return this; }, i;
+    function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await(o[n](v)), done: false } : f ? f(v) : v; } : f; }
+};
 var __asyncGenerator = (undefined && undefined.__asyncGenerator) || function (thisArg, _arguments, generator) {
     if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
     var g = generator.apply(thisArg, _arguments || []), i, q = [];
@@ -5726,34 +6165,21 @@ var __asyncGenerator = (undefined && undefined.__asyncGenerator) || function (th
     function reject(value) { resume("throw", value); }
     function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
 };
-const fetchOptions = {
-    redirect: "error",
-};
 /**
- * Create a Transport for the gRPC-web protocol. The protocol encodes
- * trailers in the response body and makes unary and server-streaming
- * methods available to web browsers. It uses the fetch API to make
- * HTTP requests.
- *
- * Note that this transport does not implement the grpc-web-text format,
- * which applies base64 encoding to the request and response bodies to
- * support reading streaming responses from an XMLHttpRequest.
+ * Create a Transport for the gRPC protocol.
  */
-function createGrpcWebTransport(options) {
-    var _a;
-    assertFetchApi();
-    const useBinaryFormat = (_a = options.useBinaryFormat) !== null && _a !== void 0 ? _a : true;
+function createTransport$1(opt) {
     return {
         async unary(method, signal, timeoutMs, header, message, contextValues) {
-            const { serialize, parse } = createClientMethodSerializers(method, useBinaryFormat, options.jsonOptions, options.binaryOptions);
+            const serialization = createMethodSerializationLookup(method, opt.binaryOptions, opt.jsonOptions, opt);
             timeoutMs =
                 timeoutMs === undefined
-                    ? options.defaultTimeoutMs
+                    ? opt.defaultTimeoutMs
                     : timeoutMs <= 0
                         ? undefined
                         : timeoutMs;
             return await runUnaryCall({
-                interceptors: options.interceptors,
+                interceptors: opt.interceptors,
                 signal,
                 timeoutMs,
                 req: {
@@ -5761,144 +6187,79 @@ function createGrpcWebTransport(options) {
                     service: method.parent,
                     method,
                     requestMethod: "POST",
-                    url: createMethodUrl(options.baseUrl, method),
-                    header: requestHeader(useBinaryFormat, timeoutMs, header),
+                    url: createMethodUrl(opt.baseUrl, method),
+                    header: requestHeaderWithCompression(opt.useBinaryFormat, timeoutMs, header, opt.acceptCompression, opt.sendCompression),
                     contextValues: contextValues !== null && contextValues !== void 0 ? contextValues : createContextValues(),
                     message,
                 },
                 next: async (req) => {
-                    var _a;
-                    const fetch = (_a = options.fetch) !== null && _a !== void 0 ? _a : globalThis.fetch;
-                    const response = await fetch(req.url, Object.assign(Object.assign({}, fetchOptions), { method: req.requestMethod, headers: req.header, signal: req.signal, body: encodeEnvelope(0, serialize(req.message)) }));
-                    const { headerError } = validateResponse(response.status, response.headers);
-                    if (!response.body) {
-                        if (headerError !== undefined)
-                            throw headerError;
-                        throw "missing response body";
-                    }
-                    const reader = createEnvelopeReadableStream(response.body).getReader();
-                    let trailer;
-                    let message;
-                    for (;;) {
-                        const r = await reader.read();
-                        if (r.done) {
-                            break;
-                        }
-                        const { flags, data } = r.value;
-                        if ((flags & compressedFlag) === compressedFlag) {
-                            throw new ConnectError(`protocol error: received unsupported compressed output`, Code.Internal);
-                        }
-                        if (flags === trailerFlag) {
-                            if (trailer !== undefined) {
-                                throw "extra trailer";
+                    const uRes = await opt.httpClient({
+                        url: req.url,
+                        method: "POST",
+                        header: req.header,
+                        signal: req.signal,
+                        body: pipe(createAsyncIterable([req.message]), transformSerializeEnvelope(serialization.getI(opt.useBinaryFormat)), transformCompressEnvelope(opt.sendCompression, opt.compressMinBytes), transformJoinEnvelopes(), {
+                            propagateDownStreamError: true,
+                        }),
+                    });
+                    const { compression, headerError } = validateResponseWithCompression(opt.acceptCompression, uRes.status, uRes.header);
+                    const message = await pipeTo(uRes.body, transformSplitEnvelope(opt.readMaxBytes), transformDecompressEnvelope(compression !== null && compression !== void 0 ? compression : null, opt.readMaxBytes), transformParseEnvelope(serialization.getO(opt.useBinaryFormat)), async (iterable) => {
+                        var _a, e_1, _b, _c;
+                        let message;
+                        try {
+                            for (var _d = true, iterable_1 = __asyncValues(iterable), iterable_1_1; iterable_1_1 = await iterable_1.next(), _a = iterable_1_1.done, !_a; _d = true) {
+                                _c = iterable_1_1.value;
+                                _d = false;
+                                const chunk = _c;
+                                if (message !== undefined) {
+                                    throw new ConnectError("protocol error: received extra output message for unary method", Code.Unimplemented);
+                                }
+                                message = chunk;
                             }
-                            // Unary responses require exactly one response message, but in
-                            // case of an error, it is perfectly valid to have a response body
-                            // that only contains error trailers.
-                            trailer = trailerParse(data);
-                            continue;
                         }
-                        if (message !== undefined) {
-                            throw new ConnectError("extra message", Code.Unimplemented);
+                        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+                        finally {
+                            try {
+                                if (!_d && !_a && (_b = iterable_1.return)) await _b.call(iterable_1);
+                            }
+                            finally { if (e_1) throw e_1.error; }
                         }
-                        message = parse(data);
-                    }
-                    if (trailer === undefined) {
-                        if (headerError !== undefined)
+                        return message;
+                    }, { propagateDownStreamError: false });
+                    validateTrailer(uRes.trailer, uRes.header);
+                    if (message === undefined) {
+                        // Trailers only response
+                        if (headerError) {
                             throw headerError;
-                        throw new ConnectError("missing trailer", response.headers.has(headerGrpcStatus)
+                        }
+                        throw new ConnectError("protocol error: missing output message for unary method", uRes.trailer.has(headerGrpcStatus)
                             ? Code.Unimplemented
                             : Code.Unknown);
                     }
-                    validateTrailer(trailer, response.headers);
-                    if (message === undefined) {
-                        throw new ConnectError("missing message", trailer.has(headerGrpcStatus) ? Code.Unimplemented : Code.Unknown);
+                    if (headerError) {
+                        throw new ConnectError("protocol error: received output message for unary method with error status", Code.Unknown);
                     }
                     return {
                         stream: false,
                         service: method.parent,
                         method,
-                        header: response.headers,
+                        header: uRes.header,
                         message,
-                        trailer,
+                        trailer: uRes.trailer,
                     };
                 },
             });
         },
         async stream(method, signal, timeoutMs, header, input, contextValues) {
-            const { serialize, parse } = createClientMethodSerializers(method, useBinaryFormat, options.jsonOptions, options.binaryOptions);
-            function parseResponseBody(body, foundStatus, trailerTarget, header, signal) {
-                return __asyncGenerator(this, arguments, function* parseResponseBody_1() {
-                    const reader = createEnvelopeReadableStream(body).getReader();
-                    if (foundStatus) {
-                        // A grpc-status: 0 response header was present. This is a "trailers-only"
-                        // response (a response without a body and no trailers).
-                        //
-                        // The spec seems to disallow a trailers-only response for status 0 - we are
-                        // lenient and only verify that the body is empty.
-                        //
-                        // > [...] Trailers-Only is permitted for calls that produce an immediate error.
-                        // See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
-                        if (!(yield __await(reader.read())).done) {
-                            throw "extra data for trailers-only";
-                        }
-                        return yield __await(void 0);
-                    }
-                    let trailerReceived = false;
-                    for (;;) {
-                        const result = yield __await(reader.read());
-                        if (result.done) {
-                            break;
-                        }
-                        const { flags, data } = result.value;
-                        if ((flags & trailerFlag) === trailerFlag) {
-                            if (trailerReceived) {
-                                throw "extra trailer";
-                            }
-                            trailerReceived = true;
-                            const trailer = trailerParse(data);
-                            validateTrailer(trailer, header);
-                            trailer.forEach((value, key) => trailerTarget.set(key, value));
-                            continue;
-                        }
-                        if (trailerReceived) {
-                            throw "extra message";
-                        }
-                        yield yield __await(parse(data));
-                    }
-                    // Node wil not throw an AbortError on `read` if the
-                    // signal is aborted before `getReader` is called.
-                    // As a work around we check at the end and throw.
-                    //
-                    // Ref: https://github.com/nodejs/undici/issues/1940
-                    if ("throwIfAborted" in signal) {
-                        // We assume that implementations without `throwIfAborted` (old
-                        // browsers) do honor aborted signals on `read`.
-                        signal.throwIfAborted();
-                    }
-                    if (!trailerReceived) {
-                        throw "missing trailer";
-                    }
-                });
-            }
-            async function createRequestBody(input) {
-                if (method.methodKind != "server_streaming") {
-                    throw "The fetch API does not support streaming request bodies";
-                }
-                const r = await input[Symbol.asyncIterator]().next();
-                if (r.done == true) {
-                    throw "missing request message";
-                }
-                return encodeEnvelope(0, serialize(r.value));
-            }
+            const serialization = createMethodSerializationLookup(method, opt.binaryOptions, opt.jsonOptions, opt);
             timeoutMs =
                 timeoutMs === undefined
-                    ? options.defaultTimeoutMs
+                    ? opt.defaultTimeoutMs
                     : timeoutMs <= 0
                         ? undefined
                         : timeoutMs;
             return runStreamingCall({
-                interceptors: options.interceptors,
+                interceptors: opt.interceptors,
                 signal,
                 timeoutMs,
                 req: {
@@ -5906,29 +6267,1269 @@ function createGrpcWebTransport(options) {
                     service: method.parent,
                     method,
                     requestMethod: "POST",
-                    url: createMethodUrl(options.baseUrl, method),
-                    header: requestHeader(useBinaryFormat, timeoutMs, header),
+                    url: createMethodUrl(opt.baseUrl, method),
+                    header: requestHeaderWithCompression(opt.useBinaryFormat, timeoutMs, header, opt.acceptCompression, opt.sendCompression),
                     contextValues: contextValues !== null && contextValues !== void 0 ? contextValues : createContextValues(),
                     message: input,
                 },
                 next: async (req) => {
-                    var _a;
-                    const fetch = (_a = options.fetch) !== null && _a !== void 0 ? _a : globalThis.fetch;
-                    const fRes = await fetch(req.url, Object.assign(Object.assign({}, fetchOptions), { method: req.requestMethod, headers: req.header, signal: req.signal, body: await createRequestBody(req.message) }));
-                    const { foundStatus, headerError } = validateResponse(fRes.status, fRes.headers);
-                    if (headerError != undefined) {
+                    const uRes = await opt.httpClient({
+                        url: req.url,
+                        method: "POST",
+                        header: req.header,
+                        signal: req.signal,
+                        body: pipe(req.message, transformSerializeEnvelope(serialization.getI(opt.useBinaryFormat)), transformCompressEnvelope(opt.sendCompression, opt.compressMinBytes), transformJoinEnvelopes(), { propagateDownStreamError: true }),
+                    });
+                    const { compression, foundStatus, headerError } = validateResponseWithCompression(opt.acceptCompression, uRes.status, uRes.header);
+                    if (headerError) {
                         throw headerError;
                     }
-                    if (!fRes.body) {
-                        throw "missing response body";
-                    }
-                    const trailer = new Headers();
-                    const res = Object.assign(Object.assign({}, req), { header: fRes.headers, trailer, message: parseResponseBody(fRes.body, foundStatus, trailer, fRes.headers, req.signal) });
+                    const res = Object.assign(Object.assign({}, req), { header: uRes.header, trailer: uRes.trailer, message: pipe(uRes.body, transformSplitEnvelope(opt.readMaxBytes), transformDecompressEnvelope(compression !== null && compression !== void 0 ? compression : null, opt.readMaxBytes), transformParseEnvelope(serialization.getO(opt.useBinaryFormat)), function (iterable) {
+                            return __asyncGenerator(this, arguments, function* () {
+                                yield __await(yield* __asyncDelegator(__asyncValues(iterable)));
+                                if (!foundStatus) {
+                                    validateTrailer(uRes.trailer, uRes.header);
+                                }
+                            });
+                        }, { propagateDownStreamError: true }) });
                     return res;
                 },
             });
         },
     };
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Similar to ConnectError.from(), this function turns any value into
+ * a ConnectError, but special cases some Node.js specific error codes and
+ * sets an appropriate Connect error code.
+ */
+function connectErrorFromNodeReason(reason) {
+    let code = Code.Internal;
+    const chain = unwrapNodeErrorChain(reason).map(getNodeErrorProps);
+    if (chain.some((p) => p.code == "ERR_STREAM_WRITE_AFTER_END")) {
+        // We do not want intentional errors from the server to be shadowed
+        // by client-side errors.
+        // This can occur if the server has written a response with an error
+        // and has ended the connection. This response may already sit in a
+        // buffer on the client, while it is still writing to the request
+        // body.
+        // To avoid this problem, we wrap ERR_STREAM_WRITE_AFTER_END as a
+        // ConnectError with Code.Aborted. The special meaning of this code
+        // in this situation is documented in StreamingConn.send() and in
+        // createServerStreamingFn().
+        code = Code.Aborted;
+    }
+    else if (chain.some((p) => p.code == "ERR_STREAM_DESTROYED" ||
+        p.code == "ERR_HTTP2_INVALID_STREAM" ||
+        p.code == "ECONNRESET")) {
+        // A handler whose stream is suddenly destroyed usually means the client
+        // hung up. This behavior is triggered by the conformance test "cancel_after_begin".
+        code = Code.Aborted;
+    }
+    else if (chain.some((p) => p.code == "ETIMEDOUT" ||
+        p.code == "ENOTFOUND" ||
+        p.code == "EAI_AGAIN" ||
+        p.code == "ECONNREFUSED")) {
+        // Calling an unresolvable host should raise a ConnectError with
+        // Code.Aborted.
+        // This behavior is covered by the conformance test "unresolvable_host".
+        code = Code.Unavailable;
+    }
+    const ce = ConnectError.from(reason, code);
+    if (ce !== reason) {
+        ce.cause = reason;
+    }
+    return ce;
+}
+/**
+ * Unwraps a chain of errors, by walking through all "cause" properties
+ * recursively.
+ * This function is useful to find the root cause of an error.
+ */
+function unwrapNodeErrorChain(reason) {
+    const chain = [];
+    for (;;) {
+        if (!(reason instanceof Error)) {
+            break;
+        }
+        if (chain.includes(reason)) {
+            // safeguard against infinite loop when "cause" points to an ancestor
+            break;
+        }
+        chain.push(reason);
+        if (!("cause" in reason)) {
+            break;
+        }
+        reason = reason.cause;
+    }
+    return chain;
+}
+/**
+ * Returns standard Node.js error properties from the given reason, if present.
+ *
+ * For context: Every error raised by Node.js APIs should expose a `code`
+ * property - a string that permanently identifies the error. Some errors may
+ * have an additional `syscall` property - a string that identifies native
+ * components, for example "getaddrinfo" of libuv.
+ * For more information, see https://github.com/nodejs/node/blob/f6052c68c1f9a4400a723e9c0b79da14197ab754/lib/internal/errors.js
+ */
+function getNodeErrorProps(reason) {
+    const props = {};
+    if (reason instanceof Error) {
+        if ("code" in reason && typeof reason.code == "string") {
+            props.code = reason.code;
+        }
+        if ("syscall" in reason && typeof reason.syscall == "string") {
+            props.syscall = reason.syscall;
+        }
+    }
+    return props;
+}
+/**
+ * Returns a ConnectError for an HTTP/2 error code.
+ */
+function connectErrorFromH2ResetCode(rstCode) {
+    switch (rstCode) {
+        case H2Code.PROTOCOL_ERROR:
+        case H2Code.INTERNAL_ERROR:
+        case H2Code.FLOW_CONTROL_ERROR:
+        case H2Code.SETTINGS_TIMEOUT:
+        case H2Code.FRAME_SIZE_ERROR:
+        case H2Code.COMPRESSION_ERROR:
+        case H2Code.CONNECT_ERROR:
+            return new ConnectError(`http/2 stream closed with error code ${H2Code[rstCode]} (0x${rstCode.toString(16)})`, Code.Internal);
+        case H2Code.REFUSED_STREAM:
+            return new ConnectError(`http/2 stream closed with error code ${H2Code[rstCode]} (0x${rstCode.toString(16)})`, Code.Unavailable);
+        case H2Code.CANCEL:
+            return new ConnectError(`http/2 stream closed with error code ${H2Code[rstCode]} (0x${rstCode.toString(16)})`, Code.Canceled);
+        case H2Code.ENHANCE_YOUR_CALM:
+            return new ConnectError(`http/2 stream closed with error code ${H2Code[rstCode]} (0x${rstCode.toString(16)})`, Code.ResourceExhausted);
+        case H2Code.INADEQUATE_SECURITY:
+            return new ConnectError(`http/2 stream closed with error code ${H2Code[rstCode]} (0x${rstCode.toString(16)})`, Code.PermissionDenied);
+        case H2Code.HTTP_1_1_REQUIRED:
+            return new ConnectError(`http/2 stream closed with error code ${H2Code[rstCode]} (0x${rstCode.toString(16)})`, Code.PermissionDenied);
+        case H2Code.STREAM_CLOSED:
+    }
+    return undefined;
+}
+var H2Code;
+(function (H2Code) {
+    H2Code[H2Code["PROTOCOL_ERROR"] = 1] = "PROTOCOL_ERROR";
+    H2Code[H2Code["INTERNAL_ERROR"] = 2] = "INTERNAL_ERROR";
+    H2Code[H2Code["FLOW_CONTROL_ERROR"] = 3] = "FLOW_CONTROL_ERROR";
+    H2Code[H2Code["SETTINGS_TIMEOUT"] = 4] = "SETTINGS_TIMEOUT";
+    H2Code[H2Code["STREAM_CLOSED"] = 5] = "STREAM_CLOSED";
+    H2Code[H2Code["FRAME_SIZE_ERROR"] = 6] = "FRAME_SIZE_ERROR";
+    H2Code[H2Code["REFUSED_STREAM"] = 7] = "REFUSED_STREAM";
+    H2Code[H2Code["CANCEL"] = 8] = "CANCEL";
+    H2Code[H2Code["COMPRESSION_ERROR"] = 9] = "COMPRESSION_ERROR";
+    H2Code[H2Code["CONNECT_ERROR"] = 10] = "CONNECT_ERROR";
+    H2Code[H2Code["ENHANCE_YOUR_CALM"] = 11] = "ENHANCE_YOUR_CALM";
+    H2Code[H2Code["INADEQUATE_SECURITY"] = 12] = "INADEQUATE_SECURITY";
+    H2Code[H2Code["HTTP_1_1_REQUIRED"] = 13] = "HTTP_1_1_REQUIRED";
+})(H2Code || (H2Code = {}));
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+const gzip = promisify(zlib.gzip);
+const gunzip = promisify(zlib.gunzip);
+const brotliCompress = promisify(zlib.brotliCompress);
+const brotliDecompress = promisify(zlib.brotliDecompress);
+/**
+ * The gzip compression algorithm, implemented with the Node.js built-in module
+ * zlib. This value can be used for the `sendCompression` and `acceptCompression`
+ * option of client transports, or for the `acceptCompression` option of server
+ * plugins like `fastifyConnectPlugin` from @connectrpc/connect-fastify.
+ */
+const compressionGzip = {
+    name: "gzip",
+    compress(bytes) {
+        return gzip(bytes, {});
+    },
+    decompress(bytes, readMaxBytes) {
+        if (bytes.length == 0) {
+            return Promise.resolve(new Uint8Array(0));
+        }
+        return wrapZLibErrors(gunzip(bytes, {
+            maxOutputLength: readMaxBytes,
+        }), readMaxBytes);
+    },
+};
+/**
+ * The brotli compression algorithm, implemented with the Node.js built-in module
+ * zlib. This value can be used for the `sendCompression` and `acceptCompression`
+ * option of client transports, or for the `acceptCompression` option of server
+ * plugins like `fastifyConnectPlugin` from @connectrpc/connect-fastify.
+ */
+const compressionBrotli = {
+    name: "br",
+    compress(bytes) {
+        return brotliCompress(bytes, {});
+    },
+    decompress(bytes, readMaxBytes) {
+        if (bytes.length == 0) {
+            return Promise.resolve(new Uint8Array(0));
+        }
+        return wrapZLibErrors(brotliDecompress(bytes, {
+            maxOutputLength: readMaxBytes,
+        }), readMaxBytes);
+    },
+};
+function wrapZLibErrors(promise, readMaxBytes) {
+    return promise.catch((e) => {
+        const props = getNodeErrorProps(e);
+        let code = Code.Internal;
+        let message = "decompression failed";
+        // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
+        switch (props.code) {
+            case "ERR_BUFFER_TOO_LARGE":
+                code = Code.ResourceExhausted;
+                message = `message is larger than configured readMaxBytes ${readMaxBytes} after decompression`;
+                break;
+            case "Z_DATA_ERROR":
+            case "ERR_PADDING_2":
+                code = Code.InvalidArgument;
+                break;
+            default:
+                if (props.code !== undefined &&
+                    props.code.startsWith("ERR__ERROR_FORMAT_")) {
+                    code = Code.InvalidArgument;
+                }
+                break;
+        }
+        return Promise.reject(new ConnectError(message, code, undefined, undefined, e));
+    });
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Convert a Node.js header object to a fetch API Headers object.
+ *
+ * This function works for Node.js incoming and outgoing headers, and for the
+ * http and the http2 package.
+ *
+ * HTTP/2 pseudo-headers (:method, :path, etc.) are stripped.
+ */
+function nodeHeaderToWebHeader(nodeHeaders) {
+    const header = new Headers();
+    for (const [k, v] of Object.entries(nodeHeaders)) {
+        if (k.startsWith(":")) {
+            continue;
+        }
+        if (v === undefined) {
+            continue;
+        }
+        if (typeof v == "string") {
+            header.append(k, v);
+        }
+        else if (typeof v == "number") {
+            header.append(k, String(v));
+        }
+        else {
+            for (const e of v) {
+                header.append(k, e);
+            }
+        }
+    }
+    return header;
+}
+function webHeaderToNodeHeaders(headersInit, defaultNodeHeaders) {
+    if (headersInit === undefined && defaultNodeHeaders === undefined) {
+        return undefined;
+    }
+    const o = Object.create(null);
+    if (defaultNodeHeaders !== undefined) {
+        for (const [key, value] of Object.entries(defaultNodeHeaders)) {
+            if (Array.isArray(value)) {
+                o[key] = value.concat();
+            }
+            else if (value !== undefined) {
+                o[key] = value;
+            }
+        }
+    }
+    if (headersInit !== undefined) {
+        if (Array.isArray(headersInit)) {
+            for (const [key, value] of headersInit) {
+                appendWebHeader(o, key, value);
+            }
+        }
+        else if ("forEach" in headersInit) {
+            if (typeof headersInit.forEach == "function") {
+                headersInit.forEach((value, key) => {
+                    appendWebHeader(o, key, value);
+                });
+            }
+        }
+        else {
+            for (const [key, value] of Object.entries(headersInit)) {
+                appendWebHeader(o, key, value);
+            }
+        }
+    }
+    return o;
+}
+function appendWebHeader(o, key, value) {
+    key = key.toLowerCase();
+    const existing = o[key];
+    if (Array.isArray(existing)) {
+        existing.push(value);
+    }
+    else if (existing === undefined) {
+        o[key] = value;
+    }
+    else {
+        o[key] = [existing.toString(), value];
+    }
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Manage an HTTP/2 connection and keep it alive with PING frames.
+ *
+ * The logic is based on "Basic Keepalive" described in
+ * https://github.com/grpc/proposal/blob/0ba0c1905050525f9b0aee46f3f23c8e1e515489/A8-client-side-keepalive.md#basic-keepalive
+ * as well as the client channel arguments described in
+ * https://github.com/grpc/grpc/blob/8e137e524a1b1da7bbf4603662876d5719563b57/doc/keepalive.md
+ *
+ * Usually, the managers tracks exactly one connection, but if a connection
+ * receives a GOAWAY frame with NO_ERROR, the connection is maintained until
+ * all streams have finished, and new requests will open a new connection.
+ */
+class Http2SessionManager {
+    /**
+     * The current state of the connection:
+     *
+     * - "closed"
+     *   The connection is closed, or no connection has been opened yet.
+     * - connecting
+     *   Currently establishing a connection.
+     *
+     * - "open"
+     *   A connection is open and has open streams. PING frames are sent every
+     *   pingIntervalMs, unless a stream received data.
+     *   If a PING frame is not responded to within pingTimeoutMs, the connection
+     *   and all open streams close.
+     *
+     * - "idle"
+     *   A connection is open, but it does not have any open streams.
+     *   If pingIdleConnection is enabled, PING frames are used to keep the
+     *   connection alive, similar to an "open" connection.
+     *   If a connection is idle for longer than idleConnectionTimeoutMs, it closes.
+     *   If a request is made on an idle connection that has not been used for
+     *   longer than pingIntervalMs, the connection is verified.
+     *
+     * - "verifying"
+     *   Verifying a connection after a long period of inactivity before issuing a
+     *   request. A PING frame is sent, and if it times out within pingTimeoutMs, a
+     *   new connection is opened.
+     *
+     * - "error"
+     *   The connection is closed because of a transient error. A connection
+     *   may have failed to reach the host, or the connection may have died,
+     *   or it may have been aborted.
+     */
+    state() {
+        if (this.s.t == "ready") {
+            if (this.verifying !== undefined) {
+                return "verifying";
+            }
+            return this.s.streamCount() > 0 ? "open" : "idle";
+        }
+        return this.s.t;
+    }
+    /**
+     * Returns the error object if the connection is in the "error" state,
+     * `undefined` otherwise.
+     */
+    error() {
+        if (this.s.t == "error") {
+            return this.s.reason;
+        }
+        return undefined;
+    }
+    constructor(url, pingOptions, http2SessionOptions) {
+        var _a, _b, _c, _d;
+        this.s = closed();
+        this.shuttingDown = [];
+        this.authority = new URL(url).origin;
+        this.http2SessionOptions = http2SessionOptions;
+        this.options = {
+            pingIntervalMs: (_a = pingOptions === null || pingOptions === void 0 ? void 0 : pingOptions.pingIntervalMs) !== null && _a !== void 0 ? _a : Number.POSITIVE_INFINITY,
+            pingTimeoutMs: (_b = pingOptions === null || pingOptions === void 0 ? void 0 : pingOptions.pingTimeoutMs) !== null && _b !== void 0 ? _b : 1000 * 15,
+            pingIdleConnection: (_c = pingOptions === null || pingOptions === void 0 ? void 0 : pingOptions.pingIdleConnection) !== null && _c !== void 0 ? _c : false,
+            idleConnectionTimeoutMs: (_d = pingOptions === null || pingOptions === void 0 ? void 0 : pingOptions.idleConnectionTimeoutMs) !== null && _d !== void 0 ? _d : 1000 * 60 * 15,
+        };
+    }
+    /**
+     * Open a connection if none exists, verify an existing connection if
+     * necessary.
+     */
+    async connect() {
+        try {
+            const ready = await this.gotoReady();
+            return ready.streamCount() > 0 ? "open" : "idle";
+        }
+        catch (e) {
+            return "error";
+        }
+    }
+    /**
+     * Issue a request.
+     *
+     * This method automatically opens a connection if none exists, and verifies
+     * an existing connection if necessary. It calls http2.ClientHttp2Session.request(),
+     * and keeps track of all open http2.ClientHttp2Stream.
+     *
+     * Clients must call notifyResponseByteRead() whenever they successfully read
+     * data from the http2.ClientHttp2Stream.
+     */
+    async request(method, path, headers, options) {
+        // Request sometimes fails with goaway/destroyed
+        // errors, we use a loop to retry.
+        //
+        // This is not expected to happen often, but it is possible that a
+        // connection is closed while we are trying to open a stream.
+        //
+        // Ref: https://github.com/nodejs/help/issues/2105
+        for (;;) {
+            const ready = await this.gotoReady();
+            try {
+                const stream = ready.conn.request(Object.assign(Object.assign({}, headers), { ":method": method, ":path": path }), options);
+                ready.registerRequest(stream);
+                return stream;
+            }
+            catch (e) {
+                // Check to see if the connection is closed or destroyed
+                // and if so, we try again.
+                if (ready.conn.closed || ready.conn.destroyed) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+    }
+    /**
+     * Notify the manager of a successful read from a http2.ClientHttp2Stream.
+     *
+     * Clients must call this function whenever they successfully read data from
+     * a http2.ClientHttp2Stream obtained from request(). This informs the
+     * keep-alive logic that the connection is alive, and prevents it from sending
+     * unnecessary PING frames.
+     */
+    notifyResponseByteRead(stream) {
+        if (this.s.t == "ready") {
+            this.s.responseByteRead(stream);
+        }
+        for (const s of this.shuttingDown) {
+            s.responseByteRead(stream);
+        }
+    }
+    /**
+     * If there is an open connection, close it. This also closes any open streams.
+     */
+    abort(reason) {
+        var _a, _b, _c;
+        const err = reason !== null && reason !== void 0 ? reason : new ConnectError("connection aborted", Code.Canceled);
+        (_b = (_a = this.s).abort) === null || _b === void 0 ? void 0 : _b.call(_a, err);
+        for (const s of this.shuttingDown) {
+            (_c = s.abort) === null || _c === void 0 ? void 0 : _c.call(s, err);
+        }
+        this.setState(closedOrError(err));
+    }
+    async gotoReady() {
+        if (this.s.t == "ready") {
+            if (this.s.isShuttingDown() ||
+                this.s.conn.closed ||
+                this.s.conn.destroyed) {
+                this.setState(connect(this.authority, this.http2SessionOptions));
+            }
+            else if (this.s.requiresVerify()) {
+                await this.verify(this.s);
+            }
+        }
+        else if (this.s.t == "closed" || this.s.t == "error") {
+            this.setState(connect(this.authority, this.http2SessionOptions));
+        }
+        while (this.s.t !== "ready") {
+            if (this.s.t === "error") {
+                throw this.s.reason;
+            }
+            if (this.s.t === "connecting") {
+                await this.s.conn;
+            }
+        }
+        return this.s;
+    }
+    setState(state) {
+        var _a, _b;
+        (_b = (_a = this.s).onExitState) === null || _b === void 0 ? void 0 : _b.call(_a);
+        if (this.s.t == "ready" && this.s.isShuttingDown()) {
+            // Maintain connections that have been asked to shut down.
+            const sd = this.s;
+            this.shuttingDown.push(sd);
+            sd.onClose = sd.onError = () => {
+                const i = this.shuttingDown.indexOf(sd);
+                if (i !== -1) {
+                    this.shuttingDown.splice(i, 1);
+                }
+            };
+        }
+        switch (state.t) {
+            case "connecting":
+                state.conn.then((value) => {
+                    this.setState(ready(value, this.options));
+                }, (reason) => {
+                    this.setState(closedOrError(reason));
+                });
+                break;
+            case "ready":
+                state.onClose = () => this.setState(closed());
+                state.onError = (err) => this.setState(closedOrError(err));
+                break;
+        }
+        this.s = state;
+    }
+    verify(stateReady) {
+        if (this.verifying !== undefined) {
+            return this.verifying;
+        }
+        this.verifying = stateReady
+            .verify()
+            .then((success) => {
+            if (success) {
+                return;
+            }
+            // verify() has destroyed the old connection
+            this.setState(connect(this.authority, this.http2SessionOptions));
+        }, (reason) => {
+            this.setState(closedOrError(reason));
+        })
+            .finally(() => {
+            this.verifying = undefined;
+        });
+        return this.verifying;
+    }
+}
+function closed() {
+    return {
+        t: "closed",
+    };
+}
+function error(reason) {
+    return {
+        t: "error",
+        reason,
+    };
+}
+function closedOrError(reason) {
+    const isCancel = reason instanceof ConnectError &&
+        ConnectError.from(reason).code == Code.Canceled;
+    return isCancel ? closed() : error(reason);
+}
+function connect(authority, http2SessionOptions) {
+    let resolve;
+    let reject;
+    const conn = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    const newConn = http2.connect(authority, http2SessionOptions);
+    newConn.on("connect", onConnect);
+    newConn.on("error", onError);
+    function onConnect() {
+        resolve === null || resolve === void 0 ? void 0 : resolve(newConn);
+        cleanup();
+    }
+    function onError(err) {
+        reject === null || reject === void 0 ? void 0 : reject(connectErrorFromNodeReason(err));
+        cleanup();
+    }
+    function cleanup() {
+        newConn.off("connect", onConnect);
+        newConn.off("error", onError);
+    }
+    return {
+        t: "connecting",
+        conn,
+        abort(reason) {
+            if (!newConn.destroyed) {
+                newConn.destroy(undefined, http2.constants.NGHTTP2_CANCEL);
+            }
+            // According to the documentation, destroy() should immediately terminate
+            // the session and the socket, but we still receive a "connect" event.
+            // We must not resolve a broken connection, so we reject it manually here.
+            reject === null || reject === void 0 ? void 0 : reject(reason);
+        },
+        onExitState() {
+            cleanup();
+        },
+    };
+}
+function ready(conn, options) {
+    // Users have reported an error "The session has been destroyed" raised
+    // from H2SessionManager.request(), see https://github.com/connectrpc/connect-es/issues/683
+    // This assertion will show whether the session already died in the
+    // "connecting" state.
+    assertSessionOpen(conn);
+    // Do not block Node.js from exiting on an idle connection.
+    // Note that we ref() again for the first stream to open, and unref() again
+    // for the last stream to close.
+    conn.unref();
+    // the last time we were sure that the connection is alive, via a PING
+    // response, or via received response bytes
+    let lastAliveAt = Date.now();
+    // how many streams are currently open on this session
+    let streamCount = 0;
+    // timer for the keep-alive interval
+    let pingIntervalId;
+    // timer for waiting for a PING response
+    let pingTimeoutId;
+    // keep track of GOAWAY - gracefully shut down open streams / wait for connection to error
+    let receivedGoAway = false;
+    // keep track of GOAWAY with ENHANCE_YOUR_CALM and with debug data too_many_pings
+    let receivedGoAwayEnhanceYourCalmTooManyPings = false;
+    // timer for closing connections without open streams, must be initialized
+    let idleTimeoutId;
+    resetIdleTimeout();
+    const state = {
+        t: "ready",
+        conn,
+        streamCount() {
+            return streamCount;
+        },
+        requiresVerify() {
+            const elapsedMs = Date.now() - lastAliveAt;
+            return elapsedMs > options.pingIntervalMs;
+        },
+        isShuttingDown() {
+            return receivedGoAway;
+        },
+        onClose: undefined,
+        onError: undefined,
+        registerRequest(stream) {
+            streamCount++;
+            if (streamCount == 1) {
+                conn.ref();
+                resetPingInterval(); // reset to ping with the appropriate interval for "open"
+                stopIdleTimeout();
+            }
+            stream.once("response", () => {
+                lastAliveAt = Date.now();
+                resetPingInterval();
+            });
+            stream.once("close", () => {
+                streamCount--;
+                if (streamCount == 0) {
+                    conn.unref();
+                    resetPingInterval(); // reset to ping with the appropriate interval for "idle"
+                    resetIdleTimeout();
+                }
+            });
+        },
+        responseByteRead(stream) {
+            if (stream.session !== conn) {
+                return;
+            }
+            if (conn.closed || conn.destroyed) {
+                return;
+            }
+            if (streamCount <= 0) {
+                return;
+            }
+            lastAliveAt = Date.now();
+            resetPingInterval();
+        },
+        verify() {
+            conn.ref();
+            return new Promise((resolve) => {
+                commonPing(() => {
+                    if (streamCount == 0)
+                        conn.unref();
+                    resolve(true);
+                });
+                conn.once("error", () => resolve(false));
+            });
+        },
+        abort(reason) {
+            if (!conn.destroyed) {
+                conn.once("error", () => {
+                    // conn.destroy() may raise an error after onExitState() was called
+                    // and our error listeners are removed.
+                    // We attach this one to swallow uncaught exceptions.
+                });
+                conn.destroy(reason, http2.constants.NGHTTP2_CANCEL);
+            }
+        },
+        onExitState() {
+            if (state.isShuttingDown()) {
+                // Per the interface, this method is called when the manager is leaving
+                // the state. We maintain this connection in the session manager until
+                // all streams have finished, so we do not detach event listeners here.
+                return;
+            }
+            cleanup();
+            this.onError = undefined;
+            this.onClose = undefined;
+        },
+    };
+    // start or restart the ping interval
+    function resetPingInterval() {
+        stopPingInterval();
+        if (streamCount > 0 || options.pingIdleConnection) {
+            pingIntervalId = safeSetTimeout(onPingInterval, options.pingIntervalMs);
+        }
+    }
+    function stopPingInterval() {
+        clearTimeout(pingIntervalId);
+        clearTimeout(pingTimeoutId);
+    }
+    function onPingInterval() {
+        commonPing(resetPingInterval);
+    }
+    function commonPing(onSuccess) {
+        clearTimeout(pingTimeoutId);
+        pingTimeoutId = safeSetTimeout(() => {
+            conn.destroy(new ConnectError("PING timed out", Code.Unavailable), http2.constants.NGHTTP2_CANCEL);
+        }, options.pingTimeoutMs);
+        conn.ping((err, duration) => {
+            clearTimeout(pingTimeoutId);
+            if (err !== null) {
+                // We will receive an ERR_HTTP2_PING_CANCEL here if we destroy the
+                // connection with a pending ping.
+                // We might also see other errors, but they should be picked up by the
+                // "error" event listener.
+                return;
+            }
+            if (duration > options.pingTimeoutMs) {
+                // setTimeout is not precise, and HTTP/2 pings take less than 1ms in
+                // tests.
+                conn.destroy(new ConnectError("PING timed out", Code.Unavailable), http2.constants.NGHTTP2_CANCEL);
+                return;
+            }
+            lastAliveAt = Date.now();
+            onSuccess();
+        });
+    }
+    function stopIdleTimeout() {
+        clearTimeout(idleTimeoutId);
+    }
+    function resetIdleTimeout() {
+        idleTimeoutId = safeSetTimeout(onIdleTimeout, options.idleConnectionTimeoutMs);
+    }
+    function onIdleTimeout() {
+        conn.close();
+        onClose(); // trigger a state change right away, so we are not open to races
+    }
+    function onGoaway(errorCode, lastStreamID, opaqueData) {
+        receivedGoAway = true;
+        const tooManyPingsAscii = Buffer.from("too_many_pings", "ascii");
+        if (errorCode === http2.constants.NGHTTP2_ENHANCE_YOUR_CALM &&
+            opaqueData != null &&
+            opaqueData.equals(tooManyPingsAscii)) {
+            // double pingIntervalMs, following the last paragraph of https://github.com/grpc/proposal/blob/0ba0c1905050525f9b0aee46f3f23c8e1e515489/A8-client-side-keepalive.md#basic-keepalive
+            options.pingIntervalMs = options.pingIntervalMs * 2;
+            receivedGoAwayEnhanceYourCalmTooManyPings = true;
+        }
+        if (errorCode === http2.constants.NGHTTP2_NO_ERROR && streamCount == 0) {
+            // Node.js v16 closes the connection on its own when it receives a GOAWAY
+            // frame and there are no open streams (emitting a "close" event and
+            // destroying the session), but later versions do not.
+            // Calling close() ourselves is ineffective here - it appears that the
+            // method is already being called, see https://github.com/nodejs/node/blob/198affc63973805ce5102d246f6b7822be57f5fc/lib/internal/http2/core.js#L681
+            conn.destroy(new ConnectError("received GOAWAY without any open streams", Code.Canceled), http2.constants.NGHTTP2_NO_ERROR);
+        }
+    }
+    function onClose() {
+        var _a;
+        cleanup();
+        (_a = state.onClose) === null || _a === void 0 ? void 0 : _a.call(state);
+    }
+    function onError(err) {
+        var _a, _b;
+        cleanup();
+        if (receivedGoAwayEnhanceYourCalmTooManyPings) {
+            // We cannot prevent node from destroying session and streams with its own
+            // error that does not carry debug data, but at least we can wrap the error
+            // we surface on the manager.
+            const ce = new ConnectError(`http/2 connection closed with error code ENHANCE_YOUR_CALM (0x${http2.constants.NGHTTP2_ENHANCE_YOUR_CALM.toString(16)}), too_many_pings, doubled the interval`, Code.ResourceExhausted);
+            (_a = state.onError) === null || _a === void 0 ? void 0 : _a.call(state, ce);
+        }
+        else {
+            (_b = state.onError) === null || _b === void 0 ? void 0 : _b.call(state, connectErrorFromNodeReason(err));
+        }
+    }
+    function cleanup() {
+        stopPingInterval();
+        stopIdleTimeout();
+        conn.off("error", onError);
+        conn.off("close", onClose);
+        conn.off("goaway", onGoaway);
+    }
+    conn.on("error", onError);
+    conn.on("close", onClose);
+    conn.on("goaway", onGoaway);
+    return state;
+}
+/**
+ * setTimeout(), but simply ignores values larger than the maximum supported
+ * value (signed 32-bit integer) instead of calling the callback right away,
+ * and does not block Node.js from exiting.
+ */
+function safeSetTimeout(callback, ms) {
+    if (ms > 0x7fffffff) {
+        return;
+    }
+    return setTimeout(callback, ms).unref();
+}
+function assertSessionOpen(conn) {
+    if (conn.connecting) {
+        throw new ConnectError("expected open session, but it is connecting", Code.Internal);
+    }
+    if (conn.destroyed) {
+        throw new ConnectError("expected open session, but it is destroyed", Code.Internal);
+    }
+    if (conn.closed) {
+        throw new ConnectError("expected open session, but it is closed", Code.Internal);
+    }
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Create a universal client function, a minimal abstraction of an HTTP client,
+ * using the Node.js `http`, `https`, or `http2` module.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function createNodeHttpClient(options) {
+    var _a;
+    if (options.httpVersion == "1.1") {
+        return createNodeHttp1Client(options.nodeOptions);
+    }
+    const sessionProvider = (_a = options.sessionProvider) !== null && _a !== void 0 ? _a : ((url) => new Http2SessionManager(url));
+    return createNodeHttp2Client(sessionProvider);
+}
+/**
+ * Create an HTTP client using the Node.js `http` or `https` package.
+ *
+ * The HTTP client is a simple function conforming to the type UniversalClientFn.
+ * It takes an UniversalClientRequest as an argument, and returns a promise for
+ * an UniversalClientResponse.
+ */
+function createNodeHttp1Client(httpOptions) {
+    return async function request(req) {
+        const sentinel = createSentinel(req.signal);
+        return new Promise((resolve, reject) => {
+            sentinel.catch((e) => {
+                reject(e);
+            });
+            h1Request(sentinel, req.url, Object.assign(Object.assign({}, httpOptions), { headers: webHeaderToNodeHeaders(req.header, httpOptions === null || httpOptions === void 0 ? void 0 : httpOptions.headers), method: req.method }), (request) => {
+                void sinkRequest(req, request, sentinel);
+                request.on("response", (response) => {
+                    var _a;
+                    response.on("error", sentinel.reject);
+                    sentinel.catch((reason) => response.destroy(connectErrorFromNodeReason(reason)));
+                    const trailer = new Headers();
+                    resolve({
+                        status: (_a = response.statusCode) !== null && _a !== void 0 ? _a : 0,
+                        header: nodeHeaderToWebHeader(response.headers),
+                        body: h1ResponseIterable(sentinel, response, trailer),
+                        trailer,
+                    });
+                });
+            });
+        });
+    };
+}
+/**
+ * Create an HTTP client using the Node.js `http2` package.
+ *
+ * The HTTP client is a simple function conforming to the type UniversalClientFn.
+ * It takes an UniversalClientRequest as an argument, and returns a promise for
+ * an UniversalClientResponse.
+ */
+function createNodeHttp2Client(sessionProvider) {
+    return function request(req) {
+        const sentinel = createSentinel(req.signal);
+        const sessionManager = sessionProvider(req.url);
+        return new Promise((resolve, reject) => {
+            sentinel.catch((e) => {
+                reject(e);
+            });
+            h2Request(sentinel, sessionManager, req.url, req.method, webHeaderToNodeHeaders(req.header), {}, (stream) => {
+                void sinkRequest(req, stream, sentinel);
+                stream.on("response", (headers) => {
+                    var _a;
+                    const response = {
+                        status: (_a = headers[":status"]) !== null && _a !== void 0 ? _a : 0,
+                        header: nodeHeaderToWebHeader(headers),
+                        body: h2ResponseIterable(sentinel, stream, sessionManager),
+                        trailer: h2ResponseTrailer(stream),
+                    };
+                    resolve(response);
+                });
+            });
+        });
+    };
+}
+function h1Request(sentinel, url, options, onRequest) {
+    let request;
+    if (new URL(url).protocol.startsWith("https")) {
+        request = https.request(url, options);
+    }
+    else {
+        request = http.request(url, options);
+    }
+    sentinel.catch((reason) => request.destroy(connectErrorFromNodeReason(reason)));
+    // Node.js will only send headers with the first request body byte by default.
+    // We force it to send headers right away for consistent behavior between
+    // HTTP/1.1 and HTTP/2.2 clients.
+    request.flushHeaders();
+    request.on("error", sentinel.reject);
+    request.on("socket", function onRequestSocket(socket) {
+        function onSocketConnect() {
+            socket.off("connect", onSocketConnect);
+            onRequest(request);
+        }
+        // If readyState is open, then socket is already open due to keepAlive, so
+        // the 'connect' event will never fire so call onRequest explicitly
+        if (socket.readyState === "open") {
+            onRequest(request);
+        }
+        else {
+            socket.on("connect", onSocketConnect);
+        }
+    });
+}
+function h1ResponseIterable(sentinel, response, trailer) {
+    const inner = response[Symbol.asyncIterator]();
+    return {
+        [Symbol.asyncIterator]() {
+            return {
+                async next() {
+                    const r = await sentinel.race(inner.next());
+                    if (r.done === true) {
+                        nodeHeaderToWebHeader(response.trailers).forEach((value, key) => {
+                            trailer.set(key, value);
+                        });
+                        sentinel.resolve();
+                        await sentinel;
+                    }
+                    return r;
+                },
+                throw(e) {
+                    sentinel.reject(e);
+                    throw e;
+                },
+            };
+        },
+    };
+}
+function h2Request(sentinel, sm, url, method, headers, options, onStream) {
+    const requestUrl = new URL(url);
+    if (requestUrl.origin !== sm.authority) {
+        const message = `cannot make a request to ${requestUrl.origin}: the http2 session is connected to ${sm.authority}`;
+        sentinel.reject(new ConnectError(message, Code.Internal));
+        return;
+    }
+    sm.request(method, requestUrl.pathname + requestUrl.search, headers, {}).then((stream) => {
+        sentinel.catch((reason) => {
+            if (stream.closed) {
+                return;
+            }
+            // Node.js http2 streams that are aborted via an AbortSignal close with
+            // an RST_STREAM with code INTERNAL_ERROR.
+            // To comply with the mapping between gRPC and HTTP/2 codes, we need to
+            // close with code CANCEL.
+            // See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#errors
+            // See https://www.rfc-editor.org/rfc/rfc7540#section-7
+            const rstCode = reason instanceof ConnectError && reason.code == Code.Canceled
+                ? H2Code.CANCEL
+                : H2Code.INTERNAL_ERROR;
+            return new Promise((resolve) => stream.close(rstCode, resolve));
+        });
+        stream.on("error", function h2StreamError(e) {
+            if (stream.writableEnded &&
+                unwrapNodeErrorChain(e)
+                    .map(getNodeErrorProps)
+                    .some((p) => p.code == "ERR_STREAM_WRITE_AFTER_END")) {
+                return;
+            }
+            sentinel.reject(e);
+        });
+        stream.on("close", function h2StreamClose() {
+            const err = connectErrorFromH2ResetCode(stream.rstCode);
+            if (err) {
+                sentinel.reject(err);
+            }
+        });
+        onStream(stream);
+    }, (reason) => {
+        sentinel.reject(reason);
+    });
+}
+function h2ResponseTrailer(response) {
+    const trailer = new Headers();
+    response.on("trailers", (args) => {
+        nodeHeaderToWebHeader(args).forEach((value, key) => {
+            trailer.set(key, value);
+        });
+    });
+    return trailer;
+}
+function h2ResponseIterable(sentinel, response, sm) {
+    const inner = response[Symbol.asyncIterator]();
+    return {
+        [Symbol.asyncIterator]() {
+            return {
+                async next() {
+                    const r = await sentinel.race(inner.next());
+                    if (r.done === true) {
+                        sentinel.resolve();
+                        await sentinel;
+                    }
+                    sm === null || sm === void 0 ? void 0 : sm.notifyResponseByteRead(response);
+                    return r;
+                },
+                throw(e) {
+                    sentinel.reject(e);
+                    throw e;
+                },
+            };
+        },
+    };
+}
+async function sinkRequest(request, nodeRequest, sentinel) {
+    if (request.body === undefined) {
+        await new Promise((resolve) => nodeRequest.end(resolve));
+        return;
+    }
+    const it = request.body[Symbol.asyncIterator]();
+    return new Promise((resolve) => {
+        writeNext();
+        function writeNext() {
+            if (sentinel.isRejected()) {
+                return;
+            }
+            it.next().then((r) => {
+                if (r.done === true) {
+                    nodeRequest.end(resolve);
+                    return;
+                }
+                nodeRequest.write(r.value, "binary", function (e) {
+                    if (e === null || e === undefined) {
+                        writeNext();
+                        return;
+                    }
+                    if (it.throw !== undefined) {
+                        it.throw(connectErrorFromNodeReason(e)).catch(() => {
+                            //
+                        });
+                    }
+                    // If the server responds and closes the connection before the client has written the entire response
+                    // body, we get an ERR_STREAM_WRITE_AFTER_END error code from Node.js here.
+                    // We do want to notify the iterable of the error condition, but we do not want to reject our sentinel,
+                    // because that would also affect the reading side.
+                    if (nodeRequest.writableEnded &&
+                        unwrapNodeErrorChain(e)
+                            .map(getNodeErrorProps)
+                            .some((p) => p.code == "ERR_STREAM_WRITE_AFTER_END")) {
+                        return;
+                    }
+                    sentinel.reject(e);
+                });
+            }, (e) => {
+                sentinel.reject(e);
+            });
+        }
+    });
+}
+function createSentinel(signal) {
+    let res;
+    let rej;
+    let resolved = false;
+    let rejected = false;
+    const p = new Promise((resolve, reject) => {
+        res = resolve;
+        rej = reject;
+    });
+    const c = {
+        resolve() {
+            if (!resolved && !rejected) {
+                resolved = true;
+                res === null || res === void 0 ? void 0 : res();
+            }
+        },
+        isResolved() {
+            return resolved;
+        },
+        reject(reason) {
+            if (!resolved && !rejected) {
+                rejected = true;
+                rej === null || rej === void 0 ? void 0 : rej(connectErrorFromNodeReason(reason));
+            }
+        },
+        isRejected() {
+            return rejected;
+        },
+        async race(promise) {
+            const r = await Promise.race([promise, p]);
+            if (r === undefined && resolved) {
+                throw new ConnectError("sentinel completed early", Code.Internal);
+            }
+            return r;
+        },
+    };
+    const s = Object.assign(p, c);
+    function onSignalAbort() {
+        c.reject(getAbortSignalReason(this));
+    }
+    if (signal) {
+        if (signal.aborted) {
+            c.reject(getAbortSignalReason(signal));
+        }
+        else {
+            signal.addEventListener("abort", onSignalAbort);
+        }
+        p.finally(() => signal.removeEventListener("abort", onSignalAbort)).catch(() => {
+            // We intentionally swallow sentinel rejection - errors must
+            // propagate through the request or response iterables.
+        });
+    }
+    return s;
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Asserts that the options are within sane limits, and returns default values
+ * where no value is provided.
+ *
+ * @private Internal code, does not follow semantic versioning.
+ */
+function validateNodeTransportOptions(options) {
+    var _a, _b, _c, _d;
+    let httpClient;
+    if (options.httpVersion == "2") {
+        let sessionManager;
+        if (options.sessionManager) {
+            sessionManager = options.sessionManager;
+        }
+        else {
+            sessionManager = new Http2SessionManager(options.baseUrl, {
+                pingIntervalMs: options.pingIntervalMs,
+                pingIdleConnection: options.pingIdleConnection,
+                pingTimeoutMs: options.pingTimeoutMs,
+                idleConnectionTimeoutMs: options.idleConnectionTimeoutMs,
+            }, options.nodeOptions);
+        }
+        httpClient = createNodeHttpClient({
+            httpVersion: "2",
+            sessionProvider: () => sessionManager,
+        });
+    }
+    else {
+        httpClient = createNodeHttpClient({
+            httpVersion: "1.1",
+            nodeOptions: options.nodeOptions,
+        });
+    }
+    return Object.assign(Object.assign(Object.assign({}, options), { httpClient, useBinaryFormat: (_a = options.useBinaryFormat) !== null && _a !== void 0 ? _a : true, interceptors: (_b = options.interceptors) !== null && _b !== void 0 ? _b : [], sendCompression: (_c = options.sendCompression) !== null && _c !== void 0 ? _c : null, acceptCompression: (_d = options.acceptCompression) !== null && _d !== void 0 ? _d : [
+            compressionGzip,
+            compressionBrotli,
+        ] }), validateReadWriteMaxBytes(options.readMaxBytes, options.writeMaxBytes, options.compressMinBytes));
+}
+
+// Copyright 2021-2025 The Connect Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/**
+ * Create a Transport for the gRPC protocol using the Node.js `http2` module.
+ */
+function createGrpcTransport(options) {
+    return createTransport$1(validateNodeTransportOptions(Object.assign(Object.assign({}, options), { httpVersion: "2" })));
 }
 
 const createAuthInterceptor = (token) => {
@@ -5943,9 +7544,10 @@ const createTransport = (baseUrl, token) => {
     if (token) {
         interceptors.push(createAuthInterceptor(token));
     }
-    return createGrpcWebTransport({
+    return createGrpcTransport({
         baseUrl: baseUrl,
-        interceptors: interceptors
+        interceptors: interceptors,
+        useBinaryFormat: true,
     });
 };
 
