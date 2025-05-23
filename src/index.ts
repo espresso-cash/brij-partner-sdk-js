@@ -40,7 +40,12 @@ import {
   ValidationResult,
   Order,
   RampType,
+  KycStatusDetails,
+  KycItem,
+  toKycStatus,
 } from "./models/models";
+
+import { KycItemSchema } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -553,40 +558,49 @@ export class BrijPartnerClient {
     return base58.encode(decryptedSecretKey);
   }
 
-  // TODO: Implement this
-  // async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<GetKycStatusResponse> {
-  //   const response = await this._storageClient!.getKycStatus({
-  //     userPublicKey: params.userPK,
-  //     country: params.country,
-  //     validatorPublicKey: this._verifierAuthPk,
-  //   });
+  async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<KycStatusDetails> {
+    const response = await this._storageClient!.getKycStatus({
+      userPublicKey: params.userPK,
+      country: params.country,
+      validatorPublicKey: this._verifierAuthPk,
+    });
 
-  //   const uint8Array = response.data;
-  //   const decoded = KycItem.decode(uint8Array);
+    const uint8Array = response.data;
+    const decoded = protobuf.fromBinary(KycItemSchema, uint8Array);
 
-  //   const secret = base58.decode(params.secretKey);
+    const secret = base58.decode(params.secretKey);
 
-  //   const decryptedAdditionalData = Object.fromEntries(
-  //     await Promise.all(
-  //       Object.entries(decoded.additionalData).map(async ([key, value]) => {
-  //         if (!value || value.length === 0) {
-  //           return [key, ""];
-  //         }
+    const decryptedAdditionalData = Object.fromEntries(
+      await Promise.all(
+        Object.entries(decoded.additionalData).map(async ([key, value]) => {
+          if (!value || value.length === 0) {
+            return [key, ""];
+          }
 
-  //         const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
-  //         const decryptedBytes = await this.decryptData(encryptedBytes, secret);
-  //         return [key, new TextDecoder().decode(decryptedBytes)];
-  //       })
-  //     )
-  //   );
+          const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
+          const decryptedBytes = await this.decryptData(encryptedBytes, secret);
+          return [key, new TextDecoder().decode(decryptedBytes)];
+        })
+      )
+    );
 
-  //   decoded.additionalData = decryptedAdditionalData;
+    const kycStatus = toKycStatus(decoded.status);
 
-  //   return {
-  //     ...response,
-  //     data: decoded,
-  //   };
-  // }
+    const kycItem: KycItem = {
+      countries: decoded.countries,
+      status: kycStatus,
+      provider: decoded.provider,
+      userPublicKey: decoded.userPublicKey,
+      hashes: decoded.hashes,
+      additionalData: decryptedAdditionalData,
+    };
+
+    return {
+      status: kycStatus,
+      data: kycItem,
+      signature: base58.encode(response.signature),
+    };
+  }
 
   private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array): Promise<Uint8Array> {
     if (encryptedMessage.length < nacl.secretbox.nonceLength) {

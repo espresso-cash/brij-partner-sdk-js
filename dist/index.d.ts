@@ -1,6 +1,7 @@
 import * as brij_protos_js_gen_brij_storage_v1_partner_service_pb from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 import { ValidationStatus as ValidationStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
+import { KycStatus as KycStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
 
 declare class AppConfig {
     readonly storageBaseUrl: string;
@@ -148,6 +149,26 @@ type Order = {
     userWalletAddress?: string;
     walletPublicKey?: string;
 };
+declare enum KycStatus {
+    Unspecified = "KYC_STATUS_UNSPECIFIED",
+    Pending = "KYC_STATUS_PENDING",
+    Approved = "KYC_STATUS_APPROVED",
+    Rejected = "KYC_STATUS_REJECTED"
+}
+interface KycItem {
+    countries: string[];
+    status: KycStatus;
+    provider: string;
+    userPublicKey: string;
+    hashes: string[];
+    additionalData: Record<string, any>;
+}
+interface KycStatusDetails {
+    status: KycStatus;
+    data?: KycItem;
+    signature?: string;
+}
+declare function toKycStatus(protoStatus: KycStatus$1): KycStatus;
 
 declare class BrijPartnerClient {
     private authKeyPair;
@@ -188,6 +209,11 @@ declare class BrijPartnerClient {
     updateFees(params: UpdateFeesParams): Promise<void>;
     getUserInfo(publicKey: string): Promise<brij_protos_js_gen_brij_storage_v1_partner_service_pb.GetInfoResponse>;
     getUserSecretKey(publicKey: string): Promise<string>;
+    getKycStatusDetails(params: {
+        userPK: string;
+        country: string;
+        secretKey: string;
+    }): Promise<KycStatusDetails>;
     private decryptData;
     private createUserOnRampMessage;
     private createUserOffRampMessage;
@@ -195,5 +221,5 @@ declare class BrijPartnerClient {
     private createPartnerOffRampMessage;
 }
 
-export { AppConfig, BrijPartnerClient, RampType, ValidationStatus, toValidationStatus };
-export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, Order, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField, ValidationResult };
+export { AppConfig, BrijPartnerClient, KycStatus, RampType, ValidationStatus, toKycStatus, toValidationStatus };
+export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, KycItem, KycStatusDetails, Order, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField, ValidationResult };

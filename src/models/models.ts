@@ -1,5 +1,8 @@
 import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 import { ValidationStatus as ProtoValidationStatus } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
+import {
+  KycStatus as ProtoKycStatus,
+} from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
 
 export type OrderIds = { orderId: string; externalId?: "" } | { orderId?: ""; externalId: string };
 
@@ -91,31 +94,68 @@ export type UpdateFeesParams = {
 };
 
 export enum RampType {
-    Unspecified = "RAMP_TYPE_UNSPECIFIED",
-    OnRamp = "RAMP_TYPE_ON_RAMP",
-    OffRamp = "RAMP_TYPE_OFF_RAMP"
+  Unspecified = "RAMP_TYPE_UNSPECIFIED",
+  OnRamp = "RAMP_TYPE_ON_RAMP",
+  OffRamp = "RAMP_TYPE_OFF_RAMP"
 }
 
 export type Order = {
-    orderId: string;
-    externalId?: string;
-    created: string;
-    status: string;
-    partnerPublicKey: string;
-    userPublicKey: string;
-    comment: string;
-    type: RampType;
-    cryptoAmount: number;
-    cryptoCurrency: string;
-    fiatAmount: number;
-    fiatCurrency: string;
-    bankName: string;
-    bankAccount: string;
-    cryptoWalletAddress: string;
-    transaction: string;
-    transactionId: string;
-    userSignature?: string;
-    partnerSignature?: string;
-    userWalletAddress?: string;
-    walletPublicKey?: string;
+  orderId: string;
+  externalId?: string;
+  created: string;
+  status: string;
+  partnerPublicKey: string;
+  userPublicKey: string;
+  comment: string;
+  type: RampType;
+  cryptoAmount: number;
+  cryptoCurrency: string;
+  fiatAmount: number;
+  fiatCurrency: string;
+  bankName: string;
+  bankAccount: string;
+  cryptoWalletAddress: string;
+  transaction: string;
+  transactionId: string;
+  userSignature?: string;
+  partnerSignature?: string;
+  userWalletAddress?: string;
+  walletPublicKey?: string;
 };
+
+export enum KycStatus {
+  Unspecified = "KYC_STATUS_UNSPECIFIED",
+  Pending = "KYC_STATUS_PENDING",
+  Approved = "KYC_STATUS_APPROVED",
+  Rejected = "KYC_STATUS_REJECTED"
+}
+
+export interface KycItem {
+  countries: string[];
+  status: KycStatus;
+  provider: string;
+  userPublicKey: string;
+  hashes: string[];
+  additionalData: Record<string, any>;
+}
+
+export interface KycStatusDetails {
+  status: KycStatus;
+  data?: KycItem;
+  signature?: string;
+}
+
+export function toKycStatus(protoStatus: ProtoKycStatus): KycStatus {
+  switch (protoStatus) {
+    case ProtoKycStatus.UNSPECIFIED:
+      return KycStatus.Unspecified;
+    case ProtoKycStatus.PENDING:
+      return KycStatus.Pending;
+    case ProtoKycStatus.APPROVED:
+      return KycStatus.Approved;
+    case ProtoKycStatus.REJECTED:
+      return KycStatus.Rejected;
+    default:
+      return KycStatus.Unspecified;
+  }
+}

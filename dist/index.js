@@ -5966,6 +5966,25 @@ const createTransport = (baseUrl, token) => {
 const file_brij_storage_v1_common_kyc_item = /*@__PURE__*/
   fileDesc("CiVicmlqL3N0b3JhZ2UvdjEvY29tbW9uL2t5Y19pdGVtLnByb3RvEhZicmlqLnN0b3JhZ2UudjEuY29tbW9uIo8CCgdLeWNJdGVtEhEKCWNvdW50cmllcxgBIAMoCRIxCgZzdGF0dXMYAiABKA4yIS5icmlqLnN0b3JhZ2UudjEuY29tbW9uLkt5Y1N0YXR1cxIQCghwcm92aWRlchgDIAEoCRIXCg91c2VyX3B1YmxpY19rZXkYBCABKAkSDgoGaGFzaGVzGAUgAygJEkwKD2FkZGl0aW9uYWxfZGF0YRgGIAMoCzIzLmJyaWouc3RvcmFnZS52MS5jb21tb24uS3ljSXRlbS5BZGRpdGlvbmFsRGF0YUVudHJ5GjUKE0FkZGl0aW9uYWxEYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgMOgI4ASpxCglLeWNTdGF0dXMSGgoWS1lDX1NUQVRVU19VTlNQRUNJRklFRBAAEhYKEktZQ19TVEFUVVNfUEVORElORxABEhcKE0tZQ19TVEFUVVNfQVBQUk9WRUQQAhIXChNLWUNfU1RBVFVTX1JFSkVDVEVEEANCKlooZ28uYnJpai5maS9wcm90b3MvYnJpai9zdG9yYWdlL3YxL2NvbW1vbmIGcHJvdG8z");
 
+/**
+ * Describes the message brij.storage.v1.common.KycItem.
+ * Use `create(KycItemSchema)` to create a new message.
+ */
+const KycItemSchema = /*@__PURE__*/
+  messageDesc(file_brij_storage_v1_common_kyc_item, 0);
+
+/**
+ * Describes the enum brij.storage.v1.common.KycStatus.
+ */
+const KycStatusSchema = /*@__PURE__*/
+  enumDesc(file_brij_storage_v1_common_kyc_item, 0);
+
+/**
+ * @generated from enum brij.storage.v1.common.KycStatus
+ */
+const KycStatus$1 = /*@__PURE__*/
+  tsEnum(KycStatusSchema);
+
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
 // https://developers.google.com/protocol-buffers/
@@ -6308,6 +6327,27 @@ var RampType;
     RampType["OnRamp"] = "RAMP_TYPE_ON_RAMP";
     RampType["OffRamp"] = "RAMP_TYPE_OFF_RAMP";
 })(RampType || (RampType = {}));
+var KycStatus;
+(function (KycStatus) {
+    KycStatus["Unspecified"] = "KYC_STATUS_UNSPECIFIED";
+    KycStatus["Pending"] = "KYC_STATUS_PENDING";
+    KycStatus["Approved"] = "KYC_STATUS_APPROVED";
+    KycStatus["Rejected"] = "KYC_STATUS_REJECTED";
+})(KycStatus || (KycStatus = {}));
+function toKycStatus(protoStatus) {
+    switch (protoStatus) {
+        case KycStatus$1.UNSPECIFIED:
+            return KycStatus.Unspecified;
+        case KycStatus$1.PENDING:
+            return KycStatus.Pending;
+        case KycStatus$1.APPROVED:
+            return KycStatus.Approved;
+        case KycStatus$1.REJECTED:
+            return KycStatus.Rejected;
+        default:
+            return KycStatus.Unspecified;
+    }
+}
 
 class BrijPartnerClient {
     authKeyPair;
@@ -6726,34 +6766,38 @@ class BrijPartnerClient {
         }
         return base58.encode(decryptedSecretKey);
     }
-    // TODO: Implement this
-    // async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<GetKycStatusResponse> {
-    //   const response = await this._storageClient!.getKycStatus({
-    //     userPublicKey: params.userPK,
-    //     country: params.country,
-    //     validatorPublicKey: this._verifierAuthPk,
-    //   });
-    //   const uint8Array = response.data;
-    //   const decoded = KycItem.decode(uint8Array);
-    //   const secret = base58.decode(params.secretKey);
-    //   const decryptedAdditionalData = Object.fromEntries(
-    //     await Promise.all(
-    //       Object.entries(decoded.additionalData).map(async ([key, value]) => {
-    //         if (!value || value.length === 0) {
-    //           return [key, ""];
-    //         }
-    //         const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
-    //         const decryptedBytes = await this.decryptData(encryptedBytes, secret);
-    //         return [key, new TextDecoder().decode(decryptedBytes)];
-    //       })
-    //     )
-    //   );
-    //   decoded.additionalData = decryptedAdditionalData;
-    //   return {
-    //     ...response,
-    //     data: decoded,
-    //   };
-    // }
+    async getKycStatusDetails(params) {
+        const response = await this._storageClient.getKycStatus({
+            userPublicKey: params.userPK,
+            country: params.country,
+            validatorPublicKey: this._verifierAuthPk,
+        });
+        const uint8Array = response.data;
+        const decoded = protobuf.fromBinary(KycItemSchema, uint8Array);
+        const secret = base58.decode(params.secretKey);
+        const decryptedAdditionalData = Object.fromEntries(await Promise.all(Object.entries(decoded.additionalData).map(async ([key, value]) => {
+            if (!value || value.length === 0) {
+                return [key, ""];
+            }
+            const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
+            const decryptedBytes = await this.decryptData(encryptedBytes, secret);
+            return [key, new TextDecoder().decode(decryptedBytes)];
+        })));
+        const kycStatus = toKycStatus(decoded.status);
+        const kycItem = {
+            countries: decoded.countries,
+            status: kycStatus,
+            provider: decoded.provider,
+            userPublicKey: decoded.userPublicKey,
+            hashes: decoded.hashes,
+            additionalData: decryptedAdditionalData,
+        };
+        return {
+            status: kycStatus,
+            data: kycItem,
+            signature: base58.encode(response.signature),
+        };
+    }
     async decryptData(encryptedMessage, key) {
         if (encryptedMessage.length < nacl.secretbox.nonceLength) {
             throw new Error(`Encrypted message too short: ${encryptedMessage.length} bytes`);
@@ -6788,5 +6832,5 @@ class BrijPartnerClient {
     }
 }
 
-export { AppConfig, BrijPartnerClient, RampType, ValidationStatus, toValidationStatus };
+export { AppConfig, BrijPartnerClient, KycStatus, RampType, ValidationStatus, toKycStatus, toValidationStatus };
 //# sourceMappingURL=index.js.map
