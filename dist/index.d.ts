@@ -1,5 +1,4 @@
 import * as brij_protos_js_gen_brij_storage_v1_partner_service_pb from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
-import { GetOrderResponse } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
 import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 import { ValidationStatus as ValidationStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
 
@@ -121,6 +120,34 @@ type UpdateFeesParams = {
     };
     walletAddress?: string;
 };
+declare enum RampType {
+    Unspecified = "RAMP_TYPE_UNSPECIFIED",
+    OnRamp = "RAMP_TYPE_ON_RAMP",
+    OffRamp = "RAMP_TYPE_OFF_RAMP"
+}
+type Order = {
+    orderId: string;
+    externalId?: string;
+    created: string;
+    status: string;
+    partnerPublicKey: string;
+    userPublicKey: string;
+    comment: string;
+    type: RampType;
+    cryptoAmount: number;
+    cryptoCurrency: string;
+    fiatAmount: number;
+    fiatCurrency: string;
+    bankName: string;
+    bankAccount: string;
+    cryptoWalletAddress: string;
+    transaction: string;
+    transactionId: string;
+    userSignature?: string;
+    partnerSignature?: string;
+    userWalletAddress?: string;
+    walletPublicKey?: string;
+};
 
 declare class BrijPartnerClient {
     private authKeyPair;
@@ -146,8 +173,10 @@ declare class BrijPartnerClient {
     getUserData({ userPK, secretKey, includeValues }: DataAccessParams): Promise<UserData>;
     private decryptOrderFields;
     private processOrder;
-    getOrder({ externalId, orderId }: OrderIds): Promise<GetOrderResponse>;
-    getPartnerOrders(): Promise<GetOrderResponse[]>;
+    getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
+    getPartnerOrders(): Promise<Order[]>;
+    private transformToOrder;
+    private mapRampType;
     acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }: AcceptOnRampOrderParams & {
         userSecretKey: string;
     }): Promise<void>;
@@ -166,5 +195,5 @@ declare class BrijPartnerClient {
     private createPartnerOffRampMessage;
 }
 
-export { AppConfig, BrijPartnerClient, ValidationStatus, toValidationStatus };
-export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField, ValidationResult };
+export { AppConfig, BrijPartnerClient, RampType, ValidationStatus, toValidationStatus };
+export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, Order, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField, ValidationResult };

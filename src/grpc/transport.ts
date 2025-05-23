@@ -1,4 +1,4 @@
-import { createGrpcTransport } from "@connectrpc/connect-node";
+import { createGrpcWebTransport } from "@connectrpc/connect-web";
 import { Interceptor } from "@connectrpc/connect";
 import { createAuthInterceptor } from "./interceptors";
 
@@ -9,7 +9,7 @@ export const createTransport = (baseUrl: string, token?: string) => {
     interceptors.push(createAuthInterceptor(token));
   }
 
-  return createGrpcTransport({
+  return createGrpcWebTransport({
     baseUrl: baseUrl,
     interceptors: interceptors,
     useBinaryFormat: true,
