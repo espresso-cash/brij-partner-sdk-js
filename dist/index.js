@@ -8144,10 +8144,18 @@ class BrijPartnerClient {
     }
     async getPartnerOrders() {
         const response = await this._orderClient.getOrders({});
-        return Promise.all(response.orders.map(async (order) => {
-            const secretKey = await this.getUserSecretKey(order.userPublicKey);
-            return this.processOrder(order, base58.decode(secretKey));
-        }));
+        const partnerOrders = [];
+        for (const order of response.orders) {
+            try {
+                const secretKey = await this.getUserSecretKey(order.userPublicKey);
+                const processedOrder = await this.processOrder(order, base58.decode(secretKey));
+                partnerOrders.push(processedOrder);
+            }
+            catch (error) {
+                continue;
+            }
+        }
+        return partnerOrders;
     }
     async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }) {
         const key = base58.decode(userSecretKey);

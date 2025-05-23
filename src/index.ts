@@ -432,13 +432,19 @@ export class BrijPartnerClient {
 
   async getPartnerOrders(): Promise<GetOrderResponse[]> {
     const response = await this._orderClient!.getOrders({});
+    const partnerOrders: GetOrderResponse[] = [];
 
-    return Promise.all(
-      response.orders.map(async (order: GetOrderResponse) => {
+    for (const order of response.orders) {
+      try {
         const secretKey = await this.getUserSecretKey(order.userPublicKey);
-        return this.processOrder(order, base58.decode(secretKey));
-      })
-    );
+        const processedOrder = await this.processOrder(order, base58.decode(secretKey));
+        partnerOrders.push(processedOrder);
+      } catch (error) {
+        continue;
+      }
+    }
+
+    return partnerOrders;
   }
 
   async acceptOnRampOrder({
