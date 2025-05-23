@@ -7,8 +7,13 @@ import ed2curve from "ed2curve";
 import { create } from "@bufbuild/protobuf";
 import { AppConfig } from "./config/config";
 import { createTransport } from "./grpc/transport";
-import { PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
+import { GetKycStatusResponse, PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { GetOrderResponse, PartnerService as OrderService } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
+
+import {
+  KycStatus,
+  KycItem
+} from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
 
 import {
   DataType,
@@ -26,12 +31,15 @@ import { TimestampSchema } from 'brij_protos_js/gen/google/protobuf/timestamp_pb
 
 import {
   ValidationStatus as ProtoValidationStatus,
+  ValidationStatus,
 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
 
 import {
   KycStatus as KycStatusProto
 } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
+
 import { RampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
+import { convertToDecimalPrecision } from "./utils/currency";
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -88,14 +96,6 @@ export type UserData = {
 
 type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
 
-export enum ValidationStatus {
-  Unspecified = "UNSPECIFIED",
-  Pending = "PENDING",
-  Approved = "APPROVED",
-  Rejected = "REJECTED",
-  Unverified = "UNVERIFIED",
-}
-
 export type UpdateFeesParams = {
   onRampFee?: {
     fixedFee: number;
@@ -117,43 +117,6 @@ export type UpdateFeesParams = {
   };
   walletAddress?: string;
 };
-
-function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
-  switch (protoStatus) {
-    case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
-      return ValidationStatus.Unspecified;
-    case ProtoValidationStatus.VALIDATION_STATUS_PENDING:
-      return ValidationStatus.Pending;
-    case ProtoValidationStatus.VALIDATION_STATUS_APPROVED:
-      return ValidationStatus.Approved;
-    case ProtoValidationStatus.VALIDATION_STATUS_REJECTED:
-      return ValidationStatus.Rejected;
-    default:
-      return ValidationStatus.Unspecified;
-  }
-}
-
-export enum KycStatus {
-  Unspecified = "KYC_STATUS_UNSPECIFIED",
-  Pending = "KYC_STATUS_PENDING",
-  Approved = "KYC_STATUS_APPROVED",
-  Rejected = "KYC_STATUS_REJECTED"
-}
-
-export interface KycItem {
-  countries: string[];
-  status: KycStatus;
-  provider: string;
-  userPublicKey: string;
-  hashes: string[];
-  additionalData: Record<string, any>;
-}
-
-export interface KycStatusDetails {
-  status: KycStatus;
-  data?: KycItem;
-  signature?: string;
-}
 
 export class BrijPartnerClient {
   private authKeyPair: AuthKeyPair;
@@ -286,7 +249,7 @@ export class BrijPartnerClient {
           userData.email = {
             value: data.value,
             ...commonFields,
-            status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED))
+            status: verificationData?.status ?? ProtoValidationStatus.UNSPECIFIED
           };
           break;
         }
@@ -295,7 +258,7 @@ export class BrijPartnerClient {
           userData.phone = {
             value: data.value,
             ...commonFields,
-            status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED))
+            status: verificationData?.status ?? ProtoValidationStatus.UNSPECIFIED
           };
           break;
         }
@@ -371,7 +334,7 @@ export class BrijPartnerClient {
     return userData;
   }
 
-  private async decryptOrderFields(order: Order, secretKey: Uint8Array): Promise<Order> {
+  private async decryptOrderFields(order: GetOrderResponse, secretKey: Uint8Array): Promise<GetOrderResponse> {
     const decryptField = async (field: string | undefined) => {
       if (!field) return "";
       try {
@@ -612,16 +575,15 @@ export class BrijPartnerClient {
     return base58.encode(decryptedSecretKey);
   }
 
-  async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<KycStatusDetails> {
+  async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<GetKycStatusResponse> {
     const response = await this._storageClient!.getKycStatus({
       userPublicKey: params.userPK,
       country: params.country,
       validatorPublicKey: this._verifierAuthPk,
     });
 
-    const buffer = response.data;
-    const uint8Array = naclUtil.decodeBase64(buffer);
-    const decoded = KycItemProto.decode(uint8Array);
+    const uint8Array = response.data;
+    const decoded = KycItem.decode(uint8Array);
 
     const secret = base58.decode(params.secretKey);
 
@@ -639,20 +601,11 @@ export class BrijPartnerClient {
       )
     );
 
-
-    const kycItem: KycItem = {
-      countries: decoded.countries,
-      status: toKycStatus(decoded.status),
-      provider: decoded.provider,
-      userPublicKey: decoded.userPublicKey,
-      hashes: decoded.hashes,
-      additionalData: decryptedAdditionalData,
-    };
+    decoded.additionalData = decryptedAdditionalData;
 
     return {
-      status: response.data.status,
-      data: kycItem,
-      signature: response.data.signature,
+      ...response,
+      data: decoded,
     };
   }
 
@@ -672,26 +625,6 @@ export class BrijPartnerClient {
     return decrypted;
   }
 
-  private static readonly currencyDecimals: Record<string, number> = {
-    // Crypto currencies
-    USDC: 6,
-    SOL: 9,
-    // Fiat currencies
-    USD: 2,
-    EUR: 2,
-    NGN: 2,
-  };
-
-  private convertToDecimalPrecision(amount: number, currency: string): string {
-    const decimals = BrijPartnerClient.currencyDecimals[currency];
-
-    if (decimals === undefined) {
-      throw new Error(`Unknown currency: ${currency}`);
-    }
-
-    return Math.round(amount * Math.pow(10, decimals)).toString();
-  }
-
   private createUserOnRampMessage({
     orderId,
     cryptoAmount,
@@ -707,8 +640,8 @@ export class BrijPartnerClient {
     fiatCurrency: string;
     cryptoWalletAddress: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 
@@ -731,8 +664,8 @@ export class BrijPartnerClient {
     encryptedBankAccount: string;
     cryptoWalletAddress: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}|${cryptoWalletAddress}`;
   }
 
@@ -753,8 +686,8 @@ export class BrijPartnerClient {
     encryptedBankName: string;
     encryptedBankAccount: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}`;
   }
 
@@ -773,23 +706,8 @@ export class BrijPartnerClient {
     fiatCurrency: string;
     cryptoWalletAddress: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
-  }
-}
-
-function toKycStatus(protoStatus: number): KycStatus {
-  switch (protoStatus) {
-    case KycStatusProto.KYC_STATUS_UNSPECIFIED:
-      return KycStatus.Unspecified;
-    case KycStatusProto.KYC_STATUS_PENDING:
-      return KycStatus.Pending;
-    case KycStatusProto.KYC_STATUS_APPROVED:
-      return KycStatus.Approved;
-    case KycStatusProto.KYC_STATUS_REJECTED:
-      return KycStatus.Rejected;
-    default:
-      return KycStatus.Unspecified;
   }
 }
