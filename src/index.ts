@@ -22,7 +22,7 @@ import {
   DocumentType,
 } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 
-import { RampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
+import { RampType as ProtoRampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
 import { convertToDecimalPrecision } from "./utils/currency";
 import {
   OrderIds,
@@ -37,7 +37,9 @@ import {
   toValidationStatus,
   UpdateFeesParams,
   UserDataField,
-  ValidationResult
+  ValidationResult,
+  Order,
+  RampType,
 } from "./models/models";
 
 interface AuthKeyPair {
@@ -288,7 +290,7 @@ export class BrijPartnerClient {
     if (order.userSignature) {
       const userVerifyKey = base58.decode(order.userPublicKey);
       const userMessage =
-        order.type === RampType.ON_RAMP
+        order.type === ProtoRampType.ON_RAMP
           ? this.createUserOnRampMessage({
             orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
@@ -322,7 +324,7 @@ export class BrijPartnerClient {
     if (order.partnerSignature) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
       const partnerMessage =
-        order.type === RampType.ON_RAMP
+        order.type === ProtoRampType.ON_RAMP
           ? this.createPartnerOnRampMessage({
             orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
@@ -355,31 +357,71 @@ export class BrijPartnerClient {
     return decryptedOrder;
   }
 
-  async getOrder({ externalId, orderId }: OrderIds): Promise<GetOrderResponse> {
+  async getOrder({ externalId, orderId }: OrderIds): Promise<Order> {
     const response = await this._orderClient!.getOrder({
       orderId,
       externalId,
     });
 
     const secretKey = await this.getUserSecretKey(response.userPublicKey);
-    return this.processOrder(response, base58.decode(secretKey));
+    const processedOrder = await this.processOrder(response, base58.decode(secretKey));
+    return this.transformToOrder(processedOrder);
   }
 
-  async getPartnerOrders(): Promise<GetOrderResponse[]> {
+  async getPartnerOrders(): Promise<Order[]> {
     const response = await this._orderClient!.getOrders({});
-    const partnerOrders: GetOrderResponse[] = [];
+    const partnerOrders: Order[] = [];
 
     for (const order of response.orders) {
       try {
         const secretKey = await this.getUserSecretKey(order.userPublicKey);
         const processedOrder = await this.processOrder(order, base58.decode(secretKey));
-        partnerOrders.push(processedOrder);
+        partnerOrders.push(this.transformToOrder(processedOrder));
       } catch {
         continue;
       }
     }
 
     return partnerOrders;
+  }
+
+  private transformToOrder(orderResponse: GetOrderResponse): Order {
+    return {
+      orderId: orderResponse.orderId,
+      externalId: orderResponse.externalId || undefined,
+      created: orderResponse.created,
+      status: orderResponse.status,
+      partnerPublicKey: orderResponse.partnerPublicKey,
+      userPublicKey: orderResponse.userPublicKey,
+      comment: orderResponse.comment,
+      type: this.mapRampType(orderResponse.type),
+      cryptoAmount: orderResponse.cryptoAmount,
+      cryptoCurrency: orderResponse.cryptoCurrency,
+      fiatAmount: orderResponse.fiatAmount,
+      fiatCurrency: orderResponse.fiatCurrency,
+      bankName: orderResponse.bankName,
+      bankAccount: orderResponse.bankAccount,
+      cryptoWalletAddress: orderResponse.cryptoWalletAddress,
+      transaction: orderResponse.transaction,
+      transactionId: orderResponse.transactionId,
+      userSignature: orderResponse.userSignature || undefined,
+      partnerSignature: orderResponse.partnerSignature || undefined,
+      userWalletAddress: orderResponse.userWalletAddress || undefined,
+      walletPublicKey: orderResponse.walletPublicKey || undefined,
+    };
+  }
+
+  private mapRampType(protoRampType: ProtoRampType): RampType {
+    switch (protoRampType) {
+      case ProtoRampType.UNSPECIFIED:
+        return RampType.Unspecified;
+      case ProtoRampType.ON_RAMP:
+        return RampType.OnRamp;
+      case ProtoRampType.OFF_RAMP:
+        return RampType.OffRamp;
+      default:
+        return RampType.Unspecified;
+    }
   }
 
   async acceptOnRampOrder({

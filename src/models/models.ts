@@ -89,3 +89,33 @@ export type UpdateFeesParams = {
   };
   walletAddress?: string;
 };
+
+export enum RampType {
+    Unspecified = "RAMP_TYPE_UNSPECIFIED",
+    OnRamp = "RAMP_TYPE_ON_RAMP",
+    OffRamp = "RAMP_TYPE_OFF_RAMP"
+}
+
+export type Order = {
+    orderId: string;
+    externalId?: string;
+    created: string;
+    status: string;
+    partnerPublicKey: string;
+    userPublicKey: string;
+    comment: string;
+    type: RampType;
+    cryptoAmount: number;
+    cryptoCurrency: string;
+    fiatAmount: number;
+    fiatCurrency: string;
+    bankName: string;
+    bankAccount: string;
+    cryptoWalletAddress: string;
+    transaction: string;
+    transactionId: string;
+    userSignature?: string;
+    partnerSignature?: string;
+    userWalletAddress?: string;
+    walletPublicKey?: string;
+};
