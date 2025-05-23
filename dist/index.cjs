@@ -7930,6 +7930,7 @@ function toValidationStatus(protoStatus) {
             return exports.ValidationStatus.Unspecified;
     }
 }
+
 class BrijPartnerClient {
     authKeyPair;
     storageBaseUrl;
@@ -8205,7 +8206,7 @@ class BrijPartnerClient {
                 const processedOrder = await this.processOrder(order, base58__default.default.decode(secretKey));
                 partnerOrders.push(processedOrder);
             }
-            catch (error) {
+            catch {
                 continue;
             }
         }
@@ -8373,4 +8374,5 @@ class BrijPartnerClient {
 
 exports.AppConfig = AppConfig;
 exports.BrijPartnerClient = BrijPartnerClient;
+exports.toValidationStatus = toValidationStatus;
 //# sourceMappingURL=index.cjs.map

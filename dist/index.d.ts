@@ -1,6 +1,7 @@
 import * as brij_protos_js_gen_brij_storage_v1_partner_service_pb from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { GetOrderResponse } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
 import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
+import { ValidationStatus as ValidationStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
 
 declare class AppConfig {
     readonly storageBaseUrl: string;
@@ -86,6 +87,11 @@ type UserData = {
     } & UserDataField)[];
     selfie?: UserDataValueField<Uint8Array>;
 };
+type ValidationResult = {
+    dataId: string;
+    value: string;
+    status: ValidationStatus;
+};
 declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",
     Pending = "PENDING",
@@ -93,6 +99,7 @@ declare enum ValidationStatus {
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
+declare function toValidationStatus(protoStatus: ValidationStatus$1): ValidationStatus;
 type UpdateFeesParams = {
     onRampFee?: {
         fixedFee: number;
@@ -114,6 +121,7 @@ type UpdateFeesParams = {
     };
     walletAddress?: string;
 };
+
 declare class BrijPartnerClient {
     private authKeyPair;
     private readonly storageBaseUrl;
@@ -158,5 +166,5 @@ declare class BrijPartnerClient {
     private createPartnerOffRampMessage;
 }
 
-export { AppConfig, BrijPartnerClient, ValidationStatus };
-export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField };
+export { AppConfig, BrijPartnerClient, ValidationStatus, toValidationStatus };
+export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField, ValidationResult };

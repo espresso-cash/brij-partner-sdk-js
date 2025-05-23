@@ -7,14 +7,8 @@ import ed2curve from "ed2curve";
 import { AppConfig } from "./config/config";
 import * as protobuf from "@bufbuild/protobuf";
 import { createTransport } from "./grpc/transport";
-import { GetKycStatusResponse, PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
+import { PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { GetOrderResponse, PartnerService as OrderService } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
-
-import {
-  KycStatus,
-  KycItem
-} from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
-
 import {
   DataType,
   EmailSchema,
@@ -28,16 +22,23 @@ import {
   DocumentType,
 } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 
-import {
-  ValidationStatus as ProtoValidationStatus,
-} from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
-
-import {
-  KycStatus as KycStatusProto
-} from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
-
 import { RampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
 import { convertToDecimalPrecision } from "./utils/currency";
+import {
+  OrderIds,
+  CompleteOnRampOrderParams,
+  FailOrderParams,
+  AcceptOnRampOrderParams,
+  AcceptOffRampOrderParams,
+  RejectOrderParams,
+  DataAccessParams,
+  UserData,
+  ValidationStatus,
+  toValidationStatus,
+  UpdateFeesParams,
+  UserDataField,
+  ValidationResult
+} from "./models/models";
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -49,95 +50,6 @@ interface BrijPartnerClientOptions {
   authKeyPair: AuthKeyPair;
   appConfig?: AppConfig;
 }
-
-export type OrderIds = { orderId: string; externalId?: "" } | { orderId?: ""; externalId: string };
-
-export type CompleteOnRampOrderParams = OrderIds & { transactionId: string };
-
-export type FailOrderParams = OrderIds & { reason: string };
-
-export type AcceptOnRampOrderParams = {
-  orderId: string;
-  bankName: string;
-  bankAccount: string;
-  externalId?: string;
-};
-
-export type AcceptOffRampOrderParams = {
-  orderId: string;
-  cryptoWalletAddress: string;
-  externalId?: string;
-};
-
-export type RejectOrderParams = { orderId: string; reason: string };
-
-export type DataAccessParams = {
-  userPK: string;
-  secretKey: string;
-  includeValues?: boolean;
-};
-
-export type UserDataField = { dataId: string; hash: string };
-
-export type UserDataValueField<T> = { value: T } & UserDataField;
-
-export type UserData = {
-  email?: UserDataValueField<string> & { status: ValidationStatus };
-  phone?: UserDataValueField<string> & { status: ValidationStatus };
-  name?: { firstName: string; lastName: string } & UserDataField;
-  citizenship?: UserDataValueField<string>;
-  birthDate?: UserDataValueField<Date>;
-  documents?: ({ type: DocumentType | string; number: string; countryCode: string } & UserDataField)[];
-  bankInfos?: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[];
-  selfie?: UserDataValueField<Uint8Array>;
-}
-
-type ValidationResult = { dataId: string; value: string; status: ValidationStatus };
-
-export enum ValidationStatus {
-  Unspecified = "UNSPECIFIED",
-  Pending = "PENDING",
-  Approved = "APPROVED",
-  Rejected = "REJECTED",
-  Unverified = "UNVERIFIED",
-}
-
-function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
-  switch (protoStatus) {
-    case ProtoValidationStatus.UNSPECIFIED:
-      return ValidationStatus.Unspecified;
-    case ProtoValidationStatus.PENDING:
-      return ValidationStatus.Pending;
-    case ProtoValidationStatus.APPROVED:
-      return ValidationStatus.Approved;
-    case ProtoValidationStatus.REJECTED:
-      return ValidationStatus.Rejected;
-    default:
-      return ValidationStatus.Unspecified;
-  }
-}
-
-export type UpdateFeesParams = {
-  onRampFee?: {
-    fixedFee: number;
-    percentageFee: number;
-    conversionRates: {
-      cryptoCurrency: string;
-      fiatCurrency: string;
-      rate: number;
-    };
-  };
-  offRampFee?: {
-    fixedFee: number;
-    percentageFee: number;
-    conversionRates: {
-      cryptoCurrency: string;
-      fiatCurrency: string;
-      rate: number;
-    };
-  };
-  walletAddress?: string;
-};
 
 export class BrijPartnerClient {
   private authKeyPair: AuthKeyPair;
@@ -237,7 +149,7 @@ export class BrijPartnerClient {
     });
 
     const validationMap = new Map<string, ValidationResult>(
-      response.validationData.map((data: any) => [
+      response.validationData.map((data: { dataId: string; hash: string; status: number }) => [
         data.dataId,
         {
           dataId: data.dataId,
@@ -462,7 +374,7 @@ export class BrijPartnerClient {
         const secretKey = await this.getUserSecretKey(order.userPublicKey);
         const processedOrder = await this.processOrder(order, base58.decode(secretKey));
         partnerOrders.push(processedOrder);
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -738,3 +650,4 @@ export class BrijPartnerClient {
 }
 
 export { AppConfig };
+export * from "./models/models";
