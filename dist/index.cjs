@@ -7908,6 +7908,28 @@ function convertToDecimalPrecision(amount, currency) {
     return Math.round(amount * Math.pow(10, decimals)).toString();
 }
 
+exports.ValidationStatus = void 0;
+(function (ValidationStatus) {
+    ValidationStatus["Unspecified"] = "UNSPECIFIED";
+    ValidationStatus["Pending"] = "PENDING";
+    ValidationStatus["Approved"] = "APPROVED";
+    ValidationStatus["Rejected"] = "REJECTED";
+    ValidationStatus["Unverified"] = "UNVERIFIED";
+})(exports.ValidationStatus || (exports.ValidationStatus = {}));
+function toValidationStatus(protoStatus) {
+    switch (protoStatus) {
+        case ValidationStatus.UNSPECIFIED:
+            return exports.ValidationStatus.Unspecified;
+        case ValidationStatus.PENDING:
+            return exports.ValidationStatus.Pending;
+        case ValidationStatus.APPROVED:
+            return exports.ValidationStatus.Approved;
+        case ValidationStatus.REJECTED:
+            return exports.ValidationStatus.Rejected;
+        default:
+            return exports.ValidationStatus.Unspecified;
+    }
+}
 class BrijPartnerClient {
     authKeyPair;
     storageBaseUrl;
@@ -7992,7 +8014,7 @@ class BrijPartnerClient {
             {
                 dataId: data.dataId,
                 value: data.hash,
-                status: data.status,
+                status: toValidationStatus(data.status),
             },
         ]));
         const userData = {};
@@ -8015,7 +8037,8 @@ class BrijPartnerClient {
                     userData.email = {
                         value: data.value,
                         ...commonFields,
-                        status: verificationData?.status ?? ValidationStatus.UNSPECIFIED
+                        ...commonFields,
+                        status: verificationData?.status ?? exports.ValidationStatus.Unspecified
                     };
                     break;
                 }
@@ -8024,7 +8047,7 @@ class BrijPartnerClient {
                     userData.phone = {
                         value: data.value,
                         ...commonFields,
-                        status: verificationData?.status ?? ValidationStatus.UNSPECIFIED
+                        status: verificationData?.status ?? exports.ValidationStatus.Unspecified
                     };
                     break;
                 }

@@ -30,7 +30,6 @@ import {
 
 import {
   ValidationStatus as ProtoValidationStatus,
-  ValidationStatus,
 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
 
 import {
@@ -93,7 +92,30 @@ export type UserData = {
   selfie?: UserDataValueField<Uint8Array>;
 }
 
-type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
+type ValidationResult = { dataId: string; value: string; status: ValidationStatus };
+
+export enum ValidationStatus {
+  Unspecified = "UNSPECIFIED",
+  Pending = "PENDING",
+  Approved = "APPROVED",
+  Rejected = "REJECTED",
+  Unverified = "UNVERIFIED",
+}
+
+function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
+  switch (protoStatus) {
+    case ProtoValidationStatus.UNSPECIFIED:
+      return ValidationStatus.Unspecified;
+    case ProtoValidationStatus.PENDING:
+      return ValidationStatus.Pending;
+    case ProtoValidationStatus.APPROVED:
+      return ValidationStatus.Approved;
+    case ProtoValidationStatus.REJECTED:
+      return ValidationStatus.Rejected;
+    default:
+      return ValidationStatus.Unspecified;
+  }
+}
 
 export type UpdateFeesParams = {
   onRampFee?: {
@@ -220,7 +242,7 @@ export class BrijPartnerClient {
         {
           dataId: data.dataId,
           value: data.hash,
-          status: data.status,
+          status: toValidationStatus(data.status),
         },
       ])
     );
@@ -249,7 +271,8 @@ export class BrijPartnerClient {
           userData.email = {
             value: data.value,
             ...commonFields,
-            status: verificationData?.status ?? ProtoValidationStatus.UNSPECIFIED
+            ...commonFields,
+            status: verificationData?.status ?? ValidationStatus.Unspecified
           };
           break;
         }
@@ -258,7 +281,7 @@ export class BrijPartnerClient {
           userData.phone = {
             value: data.value,
             ...commonFields,
-            status: verificationData?.status ?? ProtoValidationStatus.UNSPECIFIED
+            status: verificationData?.status ?? ValidationStatus.Unspecified
           };
           break;
         }
