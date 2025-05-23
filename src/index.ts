@@ -293,13 +293,14 @@ export class BrijPartnerClient {
           break;
         }
         case DataType.DOCUMENT: {
-          const data = create(DocumentSchema, { type: encrypted.type, number: new TextDecoder().decode(decryptedData) });
-          documentList.push({
-            type: documentTypeToJSON(data.type),
-            number: data.number,
-            countryCode: data.countryCode,
-            ...commonFields,
-          });
+          // TODO: Implement this
+          // const data = create(DocumentSchema, { type: encrypted.type, number: new TextDecoder().decode(decryptedData) });
+          // documentList.push({
+          //   type: documentTypeToJSON(data.type),
+          //   number: data.number,
+          //   countryCode: data.countryCode,
+          //   ...commonFields,
+          // });
           break;
         }
         case DataType.BANK_INFO: {
@@ -575,39 +576,40 @@ export class BrijPartnerClient {
     return base58.encode(decryptedSecretKey);
   }
 
-  async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<GetKycStatusResponse> {
-    const response = await this._storageClient!.getKycStatus({
-      userPublicKey: params.userPK,
-      country: params.country,
-      validatorPublicKey: this._verifierAuthPk,
-    });
+  // TODO: Implement this
+  // async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<GetKycStatusResponse> {
+  //   const response = await this._storageClient!.getKycStatus({
+  //     userPublicKey: params.userPK,
+  //     country: params.country,
+  //     validatorPublicKey: this._verifierAuthPk,
+  //   });
 
-    const uint8Array = response.data;
-    const decoded = KycItem.decode(uint8Array);
+  //   const uint8Array = response.data;
+  //   const decoded = KycItem.decode(uint8Array);
 
-    const secret = base58.decode(params.secretKey);
+  //   const secret = base58.decode(params.secretKey);
 
-    const decryptedAdditionalData = Object.fromEntries(
-      await Promise.all(
-        Object.entries(decoded.additionalData).map(async ([key, value]) => {
-          if (!value || value.length === 0) {
-            return [key, ""];
-          }
+  //   const decryptedAdditionalData = Object.fromEntries(
+  //     await Promise.all(
+  //       Object.entries(decoded.additionalData).map(async ([key, value]) => {
+  //         if (!value || value.length === 0) {
+  //           return [key, ""];
+  //         }
 
-          const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
-          const decryptedBytes = await this.decryptData(encryptedBytes, secret);
-          return [key, new TextDecoder().decode(decryptedBytes)];
-        })
-      )
-    );
+  //         const encryptedBytes = typeof value === "string" ? naclUtil.decodeBase64(value) : value;
+  //         const decryptedBytes = await this.decryptData(encryptedBytes, secret);
+  //         return [key, new TextDecoder().decode(decryptedBytes)];
+  //       })
+  //     )
+  //   );
 
-    decoded.additionalData = decryptedAdditionalData;
+  //   decoded.additionalData = decryptedAdditionalData;
 
-    return {
-      ...response,
-      data: decoded,
-    };
-  }
+  //   return {
+  //     ...response,
+  //     data: decoded,
+  //   };
+  // }
 
   private async decryptData(encryptedMessage: Uint8Array, key: Uint8Array): Promise<Uint8Array> {
     if (encryptedMessage.length < nacl.secretbox.nonceLength) {
