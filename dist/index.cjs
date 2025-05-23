@@ -7918,8 +7918,8 @@ class BrijPartnerClient {
     _verifierAuthPk;
     constructor({ authKeyPair, appConfig = AppConfig.demo() }) {
         this.authKeyPair = authKeyPair;
-        this.storageBaseUrl = appConfig.storageGrpcBaseUrl;
-        this.orderBaseUrl = appConfig.orderGrpcBaseUrl;
+        this.storageBaseUrl = appConfig.storageBaseUrl;
+        this.orderBaseUrl = appConfig.orderBaseUrl;
         this._verifierAuthPk = appConfig.verifierAuthPk;
         this._authPublicKey = "";
         this._storageClient = null;
@@ -8001,7 +8001,7 @@ class BrijPartnerClient {
         const bankInfoList = [];
         for (const encrypted of response.userData) {
             const decryptedData = encrypted.encryptedValue && encrypted.encryptedValue.length > 0
-                ? await this.decryptData(naclUtil__default.default.decodeBase64(encrypted.encryptedValue.toString()), secret)
+                ? await this.decryptData(encrypted.encryptedValue, secret)
                 : new Uint8Array(0);
             const dataId = encrypted.id;
             const verificationData = validationMap.get(dataId);
