@@ -5527,24 +5527,20 @@ function setupSignal(opt) {
 class AppConfig {
     storageBaseUrl;
     orderBaseUrl;
-    storageGrpcBaseUrl;
-    orderGrpcBaseUrl;
     verifierAuthPk;
-    constructor(storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk) {
+    constructor(storageBaseUrl, orderBaseUrl, verifierAuthPk) {
         this.storageBaseUrl = storageBaseUrl;
         this.orderBaseUrl = orderBaseUrl;
-        this.storageGrpcBaseUrl = storageGrpcBaseUrl;
-        this.orderGrpcBaseUrl = orderGrpcBaseUrl;
         this.verifierAuthPk = verifierAuthPk;
     }
     static demo() {
-        return new AppConfig('https://storage-demo.brij.fi/', 'https://orders-demo.brij.fi/', 'https://storage-grpc-demo.brij.fi', 'https://orders-grpc-demo.brij.fi', 'HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E');
+        return new AppConfig('https://storage-demo.brij.fi/', 'https://orders-demo.brij.fi/', 'HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E');
     }
     static production() {
-        return new AppConfig('https://storage.brij.fi/', 'https://orders.brij.fi/', 'https://storage-grpc.brij.fi', 'https://orders-grpc.brij.fi', '88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ');
+        return new AppConfig('https://storage.brij.fi/', 'https://orders.brij.fi/', '88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ');
     }
-    static custom({ storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk, }) {
-        return new AppConfig(storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk);
+    static custom({ storageBaseUrl, orderBaseUrl, verifierAuthPk, }) {
+        return new AppConfig(storageBaseUrl, orderBaseUrl, verifierAuthPk);
     }
 }
 

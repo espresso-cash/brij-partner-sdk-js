@@ -6,17 +6,13 @@ import { KycStatus as KycStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/com
 declare class AppConfig {
     readonly storageBaseUrl: string;
     readonly orderBaseUrl: string;
-    readonly storageGrpcBaseUrl: string;
-    readonly orderGrpcBaseUrl: string;
     readonly verifierAuthPk: string;
     private constructor();
     static demo(): AppConfig;
     static production(): AppConfig;
-    static custom({ storageBaseUrl, orderBaseUrl, storageGrpcBaseUrl, orderGrpcBaseUrl, verifierAuthPk, }: {
+    static custom({ storageBaseUrl, orderBaseUrl, verifierAuthPk, }: {
         storageBaseUrl: string;
         orderBaseUrl: string;
-        storageGrpcBaseUrl: string;
-        orderGrpcBaseUrl: string;
         verifierAuthPk: string;
     }): AppConfig;
 }
