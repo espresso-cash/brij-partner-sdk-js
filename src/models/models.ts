@@ -1,8 +1,8 @@
 import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
-import { ValidationStatus as ProtoValidationStatus } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
+import { ValidationStatus as ProtoValidationStatus } from 'brij_protos_js/gen/brij/storage/v1/common/validation_data_pb';
 import {
   KycStatus as ProtoKycStatus,
-} from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
+} from 'brij_protos_js/gen/brij/storage/v1/common/kyc_pb';
 
 export type OrderIds = { orderId: string; externalId?: "" } | { orderId?: ""; externalId: string };
 
@@ -56,7 +56,7 @@ export enum ValidationStatus {
   Unverified = "UNVERIFIED",
 }
 
-export function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
+export function toValidationStatus(protoStatus?: ProtoValidationStatus | undefined): ValidationStatus {
   switch (protoStatus) {
     case ProtoValidationStatus.UNSPECIFIED:
       return ValidationStatus.Unspecified;
@@ -136,7 +136,7 @@ export interface KycItem {
   provider: string;
   userPublicKey: string;
   hashes: string[];
-  additionalData: Record<string, any>;
+  additionalData: Record<string, Uint8Array>;
 }
 
 export interface KycStatusDetails {

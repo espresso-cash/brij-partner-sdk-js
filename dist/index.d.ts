@@ -1,7 +1,7 @@
 import * as brij_protos_js_gen_brij_storage_v1_partner_service_pb from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
 import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
-import { ValidationStatus as ValidationStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_status_pb';
-import { KycStatus as KycStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
+import { ValidationStatus as ValidationStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_data_pb';
+import { KycStatus as KycStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_pb';
 
 declare class AppConfig {
     readonly storageBaseUrl: string;
@@ -51,7 +51,6 @@ type DataAccessParams = {
     includeValues?: boolean;
 };
 type UserDataField = {
-    dataId: string;
     hash: string;
 };
 type UserDataValueField<T> = {
@@ -95,7 +94,7 @@ declare enum ValidationStatus {
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
-declare function toValidationStatus(protoStatus: ValidationStatus$1): ValidationStatus;
+declare function toValidationStatus(protoStatus?: ValidationStatus$1 | undefined): ValidationStatus;
 type UpdateFeesParams = {
     onRampFee?: {
         fixedFee: number;
@@ -157,7 +156,7 @@ interface KycItem {
     provider: string;
     userPublicKey: string;
     hashes: string[];
-    additionalData: Record<string, any>;
+    additionalData: Record<string, Uint8Array>;
 }
 interface KycStatusDetails {
     status: KycStatus;
