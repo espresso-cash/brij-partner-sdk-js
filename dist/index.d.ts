@@ -1,3 +1,8 @@
+import * as brij_protos_js_gen_brij_storage_v1_partner_service_pb from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
+import { DocumentType } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
+import { ValidationStatus as ValidationStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/validation_data_pb';
+import { KycStatus as KycStatus$1 } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_pb';
+
 declare class AppConfig {
     readonly storageBaseUrl: string;
     readonly orderBaseUrl: string;
@@ -5,8 +10,13 @@ declare class AppConfig {
     private constructor();
     static demo(): AppConfig;
     static production(): AppConfig;
-    static custom(storageBaseUrl: string, orderBaseUrl: string, verifierAuthPk: string): AppConfig;
+    static custom({ storageBaseUrl, orderBaseUrl, verifierAuthPk, }: {
+        storageBaseUrl: string;
+        orderBaseUrl: string;
+        verifierAuthPk: string;
+    }): AppConfig;
 }
+
 type OrderIds = {
     orderId: string;
     externalId?: "";
@@ -41,7 +51,6 @@ type DataAccessParams = {
     includeValues?: boolean;
 };
 type UserDataField = {
-    dataId: string;
     hash: string;
 };
 type UserDataValueField<T> = {
@@ -61,7 +70,7 @@ type UserData = {
     citizenship?: UserDataValueField<string>;
     birthDate?: UserDataValueField<Date>;
     documents?: ({
-        type: string;
+        type: DocumentType | string;
         number: string;
         countryCode: string;
     } & UserDataField)[];
@@ -73,6 +82,11 @@ type UserData = {
     } & UserDataField)[];
     selfie?: UserDataValueField<Uint8Array>;
 };
+type ValidationResult = {
+    dataId: string;
+    value: string;
+    status: ValidationStatus;
+};
 declare enum ValidationStatus {
     Unspecified = "UNSPECIFIED",
     Pending = "PENDING",
@@ -80,6 +94,28 @@ declare enum ValidationStatus {
     Rejected = "REJECTED",
     Unverified = "UNVERIFIED"
 }
+declare function toValidationStatus(protoStatus?: ValidationStatus$1 | undefined): ValidationStatus;
+type UpdateFeesParams = {
+    onRampFee?: {
+        fixedFee: number;
+        percentageFee: number;
+        conversionRates: {
+            cryptoCurrency: string;
+            fiatCurrency: string;
+            rate: number;
+        };
+    };
+    offRampFee?: {
+        fixedFee: number;
+        percentageFee: number;
+        conversionRates: {
+            cryptoCurrency: string;
+            fiatCurrency: string;
+            rate: number;
+        };
+    };
+    walletAddress?: string;
+};
 declare enum RampType {
     Unspecified = "RAMP_TYPE_UNSPECIFIED",
     OnRamp = "RAMP_TYPE_ON_RAMP",
@@ -108,27 +144,6 @@ type Order = {
     userWalletAddress?: string;
     walletPublicKey?: string;
 };
-type UpdateFeesParams = {
-    onRampFee?: {
-        fixedFee: number;
-        percentageFee: number;
-        conversionRates: {
-            cryptoCurrency: string;
-            fiatCurrency: string;
-            rate: number;
-        };
-    };
-    offRampFee?: {
-        fixedFee: number;
-        percentageFee: number;
-        conversionRates: {
-            cryptoCurrency: string;
-            fiatCurrency: string;
-            rate: number;
-        };
-    };
-    walletAddress?: string;
-};
 declare enum KycStatus {
     Unspecified = "KYC_STATUS_UNSPECIFIED",
     Pending = "KYC_STATUS_PENDING",
@@ -141,13 +156,15 @@ interface KycItem {
     provider: string;
     userPublicKey: string;
     hashes: string[];
-    additionalData: Record<string, any>;
+    additionalData: Record<string, Uint8Array>;
 }
 interface KycStatusDetails {
     status: KycStatus;
     data?: KycItem;
     signature?: string;
 }
+declare function toKycStatus(protoStatus: KycStatus$1): KycStatus;
+
 declare class BrijPartnerClient {
     private authKeyPair;
     private readonly storageBaseUrl;
@@ -174,6 +191,8 @@ declare class BrijPartnerClient {
     private processOrder;
     getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
     getPartnerOrders(): Promise<Order[]>;
+    private transformToOrder;
+    private mapRampType;
     acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }: AcceptOnRampOrderParams & {
         userSecretKey: string;
     }): Promise<void>;
@@ -183,7 +202,7 @@ declare class BrijPartnerClient {
     failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void>;
     rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void>;
     updateFees(params: UpdateFeesParams): Promise<void>;
-    getUserInfo(publicKey: string): Promise<any>;
+    getUserInfo(publicKey: string): Promise<brij_protos_js_gen_brij_storage_v1_partner_service_pb.GetInfoResponse>;
     getUserSecretKey(publicKey: string): Promise<string>;
     getKycStatusDetails(params: {
         userPK: string;
@@ -191,12 +210,11 @@ declare class BrijPartnerClient {
         secretKey: string;
     }): Promise<KycStatusDetails>;
     private decryptData;
-    private static readonly currencyDecimals;
-    private convertToDecimalPrecision;
     private createUserOnRampMessage;
     private createUserOffRampMessage;
     private createPartnerOnRampMessage;
     private createPartnerOffRampMessage;
 }
 
-export { type AcceptOffRampOrderParams, type AcceptOnRampOrderParams, AppConfig, BrijPartnerClient, type CompleteOnRampOrderParams, type DataAccessParams, type FailOrderParams, type KycItem, KycStatus, type KycStatusDetails, type Order, type OrderIds, RampType, type RejectOrderParams, type UpdateFeesParams, type UserData, type UserDataField, type UserDataValueField, ValidationStatus };
+export { AppConfig, BrijPartnerClient, KycStatus, RampType, ValidationStatus, toKycStatus, toValidationStatus };
+export type { AcceptOffRampOrderParams, AcceptOnRampOrderParams, CompleteOnRampOrderParams, DataAccessParams, FailOrderParams, KycItem, KycStatusDetails, Order, OrderIds, RejectOrderParams, UpdateFeesParams, UserData, UserDataField, UserDataValueField, ValidationResult };

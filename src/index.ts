@@ -1,31 +1,52 @@
 import { base64url } from "jose";
-import axios, { AxiosInstance } from "axios";
 import nacl from "tweetnacl";
+import { createClient } from "@connectrpc/connect";
 import base58 from "bs58";
 import naclUtil from "tweetnacl-util";
 import ed2curve from "ed2curve";
+import { AppConfig } from "./config/config";
+import * as protobuf from "@bufbuild/protobuf";
+import { createTransport } from "./grpc/transport";
+import { PartnerService } from 'brij_protos_js/gen/brij/storage/v1/partner/service_pb';
+import { GetOrderResponse, PartnerService as OrderService } from 'brij_protos_js/gen/brij/orders/v1/partner/partner_pb';
 import {
-  BankInfo,
-  BirthDate,
-  Citizenship,
   DataType,
-  dataTypeFromJSON,
-  Document,
-  documentTypeToJSON,
-  Email,
-  Name,
-  Phone,
-  SelfieImage,
-} from "./generated/protos/data.js";
-import {
-  ValidationStatus as ProtoValidationStatus,
-  validationStatusFromJSON,
-} from "./generated/protos/validation_status.js";
-import {
-  KycItem as KycItemProto,
-  KycStatus as KycStatusProto,
-} from "./generated/protos/kyc_item.js";
+  EmailSchema,
+  PhoneSchema,
+  NameSchema,
+  CitizenshipSchema,
+  BirthDateSchema,
+  DocumentSchema,
+  BankInfoSchema,
+  SelfieImageSchema,
+  DocumentType,
+} from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 
+import { RampType as ProtoRampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
+import { convertToDecimalPrecision } from "./utils/currency";
+import {
+  OrderIds,
+  CompleteOnRampOrderParams,
+  FailOrderParams,
+  AcceptOnRampOrderParams,
+  AcceptOffRampOrderParams,
+  RejectOrderParams,
+  DataAccessParams,
+  UserData,
+  ValidationStatus,
+  toValidationStatus,
+  UpdateFeesParams,
+  UserDataField,
+  Order,
+  RampType,
+  KycStatusDetails,
+  KycItem,
+  toKycStatus,
+} from "./models/models";
+
+import { KycEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_pb';
+import { ValidationDataEnvelope, ValidationDataEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/validation_data_pb';
+import { UserDataEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/user_data_pb';
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -33,182 +54,9 @@ interface AuthKeyPair {
   getPublicKeyBytes(): Promise<Uint8Array>;
 }
 
-export class AppConfig {
-  readonly storageBaseUrl: string;
-  readonly orderBaseUrl: string;
-  readonly verifierAuthPk: string;
-
-  private constructor(storageBaseUrl: string, orderBaseUrl: string, verifierAuthPk: string) {
-    this.storageBaseUrl = storageBaseUrl;
-    this.orderBaseUrl = orderBaseUrl;
-    this.verifierAuthPk = verifierAuthPk;
-  }
-
-  static demo() {
-    return new AppConfig(
-      "https://storage-demo.brij.fi/",
-      "https://orders-demo.brij.fi/",
-      "HHV5joB6D4c2pigVZcQ9RY5suDMvAiHBLLBCFqmWuM4E"
-    );
-  }
-
-  static production() {
-    return new AppConfig(
-      "https://storage.brij.fi/",
-      "https://orders.brij.fi/",
-      "88tFG8dt9ZacDZb7QP5yiDQeA7sVXvr7XCwZEQSsnCkJ"
-    );
-  }
-
-  static custom(storageBaseUrl: string, orderBaseUrl: string, verifierAuthPk: string) {
-    return new AppConfig(storageBaseUrl, orderBaseUrl, verifierAuthPk);
-  }
-}
-
 interface BrijPartnerClientOptions {
   authKeyPair: AuthKeyPair;
   appConfig?: AppConfig;
-}
-
-export type OrderIds = { orderId: string; externalId?: "" } | { orderId?: ""; externalId: string };
-
-export type CompleteOnRampOrderParams = OrderIds & { transactionId: string };
-
-export type FailOrderParams = OrderIds & { reason: string };
-
-export type AcceptOnRampOrderParams = {
-  orderId: string;
-  bankName: string;
-  bankAccount: string;
-  externalId?: string;
-};
-
-export type AcceptOffRampOrderParams = {
-  orderId: string;
-  cryptoWalletAddress: string;
-  externalId?: string;
-};
-
-export type RejectOrderParams = { orderId: string; reason: string };
-
-export type DataAccessParams = {
-  userPK: string;
-  secretKey: string;
-  includeValues?: boolean;
-};
-
-export type UserDataField = { dataId: string; hash: string };
-
-export type UserDataValueField<T> = { value: T } & UserDataField;
-
-export type UserData = {
-  email?: UserDataValueField<string> & { status: ValidationStatus };
-  phone?: UserDataValueField<string> & { status: ValidationStatus };
-  name?: { firstName: string; lastName: string } & UserDataField;
-  citizenship?: UserDataValueField<string>;
-  birthDate?: UserDataValueField<Date>;
-  documents?: ({ type: string; number: string; countryCode: string } & UserDataField)[];
-  bankInfos?: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[];
-  selfie?: UserDataValueField<Uint8Array>;
-}
-
-type ValidationResult = { dataId: string; value: string; status: ProtoValidationStatus };
-
-export enum ValidationStatus {
-  Unspecified = "UNSPECIFIED",
-  Pending = "PENDING",
-  Approved = "APPROVED",
-  Rejected = "REJECTED",
-  Unverified = "UNVERIFIED",
-}
-
-export enum RampType {
-  Unspecified = "RAMP_TYPE_UNSPECIFIED",
-  OnRamp = "RAMP_TYPE_ON_RAMP",
-  OffRamp = "RAMP_TYPE_OFF_RAMP"
-}
-
-export type Order = {
-  orderId: string;
-  externalId?: string;
-  created: string;
-  status: string;
-  partnerPublicKey: string;
-  userPublicKey: string;
-  comment: string;
-  type: RampType;
-  cryptoAmount: number;
-  cryptoCurrency: string;
-  fiatAmount: number;
-  fiatCurrency: string;
-  bankName: string;
-  bankAccount: string;
-  cryptoWalletAddress: string;
-  transaction: string;
-  transactionId: string;
-  userSignature?: string;
-  partnerSignature?: string;
-  userWalletAddress?: string;
-  walletPublicKey?: string;
-};
-
-export type UpdateFeesParams = {
-  onRampFee?: {
-    fixedFee: number;
-    percentageFee: number;
-    conversionRates: {
-      cryptoCurrency: string;
-      fiatCurrency: string;
-      rate: number;
-    };
-  };
-  offRampFee?: {
-    fixedFee: number;
-    percentageFee: number;
-    conversionRates: {
-      cryptoCurrency: string;
-      fiatCurrency: string;
-      rate: number;
-    };
-  };
-  walletAddress?: string;
-};
-
-function toValidationStatus(protoStatus: ProtoValidationStatus): ValidationStatus {
-  switch (protoStatus) {
-    case ProtoValidationStatus.VALIDATION_STATUS_UNSPECIFIED:
-      return ValidationStatus.Unspecified;
-    case ProtoValidationStatus.VALIDATION_STATUS_PENDING:
-      return ValidationStatus.Pending;
-    case ProtoValidationStatus.VALIDATION_STATUS_APPROVED:
-      return ValidationStatus.Approved;
-    case ProtoValidationStatus.VALIDATION_STATUS_REJECTED:
-      return ValidationStatus.Rejected;
-    default:
-      return ValidationStatus.Unspecified;
-  }
-}
-
-export enum KycStatus {
-  Unspecified = "KYC_STATUS_UNSPECIFIED",
-  Pending = "KYC_STATUS_PENDING",
-  Approved = "KYC_STATUS_APPROVED",
-  Rejected = "KYC_STATUS_REJECTED"
-}
-
-export interface KycItem {
-  countries: string[];
-  status: KycStatus;
-  provider: string;
-  userPublicKey: string;
-  hashes: string[];
-  additionalData: Record<string, any>;
-}
-
-export interface KycStatusDetails {
-  status: KycStatus;
-  data?: KycItem;
-  signature?: string;
 }
 
 export class BrijPartnerClient {
@@ -216,8 +64,8 @@ export class BrijPartnerClient {
   private readonly storageBaseUrl: string;
   private readonly orderBaseUrl: string;
   private _authPublicKey: string;
-  private _storageClient: AxiosInstance | null;
-  private _orderClient: AxiosInstance | null;
+  private _storageClient: ReturnType<typeof createClient<typeof PartnerService>> | null;
+  private _orderClient: ReturnType<typeof createClient<typeof OrderService>> | null;
   private readonly _verifierAuthPk: string;
 
   private constructor({ authKeyPair, appConfig = AppConfig.demo() }: BrijPartnerClientOptions) {
@@ -277,17 +125,12 @@ export class BrijPartnerClient {
 
     const storageToken = await this.createToken(privateKeyBytes, "storage.brij.fi");
 
-    this._storageClient = axios.create({
-      baseURL: this.storageBaseUrl,
-      headers: { Authorization: `Bearer ${storageToken}` },
-    });
+    const storageTransport = createTransport(this.storageBaseUrl, storageToken);
+    this._storageClient = createClient(PartnerService, storageTransport);
 
     const orderToken = await this.createToken(privateKeyBytes, "orders.brij.fi");
-
-    this._orderClient = axios.create({
-      baseURL: this.orderBaseUrl,
-      headers: { Authorization: `Bearer ${orderToken}` },
-    });
+    const orderTransport = createTransport(this.orderBaseUrl, orderToken);
+    this._orderClient = createClient(OrderService, orderTransport);
   }
 
   private async createToken(privateKeyBytes: Uint8Array, audience: string): Promise<string> {
@@ -308,62 +151,62 @@ export class BrijPartnerClient {
   }
 
   async getUserData({ userPK, secretKey, includeValues = true }: DataAccessParams): Promise<UserData> {
-    const response = await this._storageClient!.post("/v1/partner/getUserData", {
+    const response = await this._storageClient!.getUserData({
       userPublicKey: userPK,
       includeValues,
     });
-    const responseData = response.data;
 
-    const validationMap = new Map<string, ValidationResult>(
-      responseData.validationData.map((data: any) => [
-        data.dataId,
-        {
-          dataId: data.dataId,
-          hash: data.hash,
-          status: data.status,
-        },
-      ])
+    const validationMap = new Map<string, ValidationDataEnvelope>(
+      response.validationData.map((data) => {
+        const validation = protobuf.fromBinary(ValidationDataEnvelopeSchema, data.payload);
+       
+        return [
+          validation.dataHash,
+          validation,
+        ];
+      })
     );
 
     const userData: UserData = {};
     const secret = base58.decode(secretKey);
 
-    const documentList: ({ type: string; number: string; countryCode: string } & UserDataField)[] = [];
+    const documentList: ({ type: DocumentType; number: string; countryCode: string } & UserDataField)[] = [];
     const bankInfoList: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[] = [];
 
-    for (const encrypted of responseData.userData) {
-      const decryptedData = encrypted.encryptedValue?.trim()
-        ? await this.decryptData(naclUtil.decodeBase64(encrypted.encryptedValue), secret)
+    for (const encrypted of response.userData) {
+      const user = protobuf.fromBinary(UserDataEnvelopeSchema, encrypted.payload);
+
+      const decryptedData = user.encryptedValue && user.encryptedValue.length > 0
+        ? await this.decryptData(user.encryptedValue, secret)
         : new Uint8Array(0);
 
-      const dataId = encrypted.id;
-      const verificationData = validationMap.get(dataId);
+      const hash = encrypted.hash;
+      const verificationData = validationMap.get(hash);
       const commonFields: UserDataField = {
-        dataId,
-        hash: encrypted.hash
+        hash: hash
       };
 
-      switch (dataTypeFromJSON(encrypted.type)) {
-        case DataType.DATA_TYPE_EMAIL: {
-          const data = Email.decode(decryptedData);
+      switch (user.type) {
+        case DataType.EMAIL: {
+          const data = protobuf.fromBinary(EmailSchema, decryptedData);
           userData.email = {
             value: data.value,
             ...commonFields,
-            status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED))
+            status: toValidationStatus(verificationData?.status) ?? ValidationStatus.Unspecified
           };
           break;
         }
-        case DataType.DATA_TYPE_PHONE: {
-          const data = Phone.decode(decryptedData);
+        case DataType.PHONE: {
+          const data = protobuf.fromBinary(PhoneSchema, decryptedData);
           userData.phone = {
             value: data.value,
             ...commonFields,
-            status: toValidationStatus(validationStatusFromJSON(verificationData?.status ?? ProtoValidationStatus.UNRECOGNIZED))
+            status: toValidationStatus(verificationData?.status) ?? ValidationStatus.Unspecified
           };
           break;
         }
-        case DataType.DATA_TYPE_NAME: {
-          const data = Name.decode(decryptedData);
+        case DataType.NAME: {
+          const data = protobuf.fromBinary(NameSchema, decryptedData);
           userData.name = {
             firstName: data.firstName,
             lastName: data.lastName,
@@ -371,34 +214,34 @@ export class BrijPartnerClient {
           };
           break;
         }
-        case DataType.DATA_TYPE_CITIZENSHIP: {
-          const data = Citizenship.decode(decryptedData);
+        case DataType.CITIZENSHIP: {
+          const data = protobuf.fromBinary(CitizenshipSchema, decryptedData);
           userData.citizenship = {
             value: data.value,
             ...commonFields
           };
           break;
         }
-        case DataType.DATA_TYPE_BIRTH_DATE: {
-          const data = BirthDate.decode(decryptedData);
+        case DataType.BIRTH_DATE: {
+          const data = protobuf.fromBinary(BirthDateSchema, decryptedData);
           userData.birthDate = {
-            value: new Date(data.value ?? ""),
+            value: data.value ? new Date(Number(data.value.seconds) * 1000 + Number(data.value.nanos) / 1_000_000) : new Date(),
             ...commonFields
           };
           break;
         }
-        case DataType.DATA_TYPE_DOCUMENT: {
-          const data = Document.decode(decryptedData);
+        case DataType.DOCUMENT: {
+          const data = protobuf.fromBinary(DocumentSchema, decryptedData);
           documentList.push({
-            type: documentTypeToJSON(data.type),
+            type: data.type,
             number: data.number,
             countryCode: data.countryCode,
             ...commonFields,
           });
           break;
         }
-        case DataType.DATA_TYPE_BANK_INFO: {
-          const data = BankInfo.decode(decryptedData);
+        case DataType.BANK_INFO: {
+          const data = protobuf.fromBinary(BankInfoSchema, decryptedData);
           bankInfoList.push({
             bankName: data.bankName,
             accountNumber: data.accountNumber,
@@ -408,8 +251,8 @@ export class BrijPartnerClient {
           });
           break;
         }
-        case DataType.DATA_TYPE_SELFIE_IMAGE: {
-          const data = SelfieImage.decode(decryptedData);
+        case DataType.SELFIE_IMAGE: {
+          const data = protobuf.fromBinary(SelfieImageSchema, decryptedData);
           userData.selfie = {
             value: data.value,
             ...commonFields
@@ -429,7 +272,7 @@ export class BrijPartnerClient {
     return userData;
   }
 
-  private async decryptOrderFields(order: Order, secretKey: Uint8Array): Promise<Order> {
+  private async decryptOrderFields(order: GetOrderResponse, secretKey: Uint8Array): Promise<GetOrderResponse> {
     const decryptField = async (field: string | undefined) => {
       if (!field) return "";
       try {
@@ -447,13 +290,13 @@ export class BrijPartnerClient {
     };
   }
 
-  private async processOrder(order: Order, secretKey: Uint8Array): Promise<Order> {
+  private async processOrder(order: GetOrderResponse, secretKey: Uint8Array): Promise<GetOrderResponse> {
     const decryptedOrder = await this.decryptOrderFields(order, secretKey);
 
     if (order.userSignature) {
       const userVerifyKey = base58.decode(order.userPublicKey);
       const userMessage =
-        order.type === RampType.OnRamp
+        order.type === ProtoRampType.ON_RAMP
           ? this.createUserOnRampMessage({
             orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
@@ -487,7 +330,7 @@ export class BrijPartnerClient {
     if (order.partnerSignature) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
       const partnerMessage =
-        order.type === RampType.OnRamp
+        order.type === ProtoRampType.ON_RAMP
           ? this.createPartnerOnRampMessage({
             orderId: order.orderId,
             cryptoAmount: order.cryptoAmount,
@@ -521,24 +364,70 @@ export class BrijPartnerClient {
   }
 
   async getOrder({ externalId, orderId }: OrderIds): Promise<Order> {
-    const response = await this._orderClient!.post("/v1/partner/getOrder", {
+    const response = await this._orderClient!.getOrder({
       orderId,
       externalId,
     });
 
-    const secretKey = await this.getUserSecretKey(response.data.userPublicKey);
-    return this.processOrder(response.data, base58.decode(secretKey));
+    const secretKey = await this.getUserSecretKey(response.userPublicKey);
+    const processedOrder = await this.processOrder(response, base58.decode(secretKey));
+    return this.transformToOrder(processedOrder);
   }
 
   async getPartnerOrders(): Promise<Order[]> {
-    const response = await this._orderClient!.post("/v1/partner/getOrders");
+    const response = await this._orderClient!.getOrders({});
+    const partnerOrders: Order[] = [];
 
-    return Promise.all(
-      response.data.orders.map(async (order: Order) => {
+    for (const order of response.orders) {
+      try {
         const secretKey = await this.getUserSecretKey(order.userPublicKey);
-        return this.processOrder(order, base58.decode(secretKey));
-      })
-    );
+        const processedOrder = await this.processOrder(order, base58.decode(secretKey));
+        partnerOrders.push(this.transformToOrder(processedOrder));
+      } catch {
+        continue;
+      }
+    }
+
+    return partnerOrders;
+  }
+
+  private transformToOrder(orderResponse: GetOrderResponse): Order {
+    return {
+      orderId: orderResponse.orderId,
+      externalId: orderResponse.externalId || undefined,
+      created: orderResponse.created,
+      status: orderResponse.status,
+      partnerPublicKey: orderResponse.partnerPublicKey,
+      userPublicKey: orderResponse.userPublicKey,
+      comment: orderResponse.comment,
+      type: this.mapRampType(orderResponse.type),
+      cryptoAmount: orderResponse.cryptoAmount,
+      cryptoCurrency: orderResponse.cryptoCurrency,
+      fiatAmount: orderResponse.fiatAmount,
+      fiatCurrency: orderResponse.fiatCurrency,
+      bankName: orderResponse.bankName,
+      bankAccount: orderResponse.bankAccount,
+      cryptoWalletAddress: orderResponse.cryptoWalletAddress,
+      transaction: orderResponse.transaction,
+      transactionId: orderResponse.transactionId,
+      userSignature: orderResponse.userSignature || undefined,
+      partnerSignature: orderResponse.partnerSignature || undefined,
+      userWalletAddress: orderResponse.userWalletAddress || undefined,
+      walletPublicKey: orderResponse.walletPublicKey || undefined,
+    };
+  }
+
+  private mapRampType(protoRampType: ProtoRampType): RampType {
+    switch (protoRampType) {
+      case ProtoRampType.UNSPECIFIED:
+        return RampType.Unspecified;
+      case ProtoRampType.ON_RAMP:
+        return RampType.OnRamp;
+      case ProtoRampType.OFF_RAMP:
+        return RampType.OffRamp;
+      default:
+        return RampType.Unspecified;
+    }
   }
 
   async acceptOnRampOrder({
@@ -573,7 +462,7 @@ export class BrijPartnerClient {
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
     const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
 
-    await this._orderClient!.post("/v1/partner/acceptOrder", {
+    await this._orderClient!.acceptOrder({
       orderId,
       bankName: encryptedBankName,
       bankAccount: encryptedBankAccount,
@@ -597,7 +486,7 @@ export class BrijPartnerClient {
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
     const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
 
-    await this._orderClient!.post("/v1/partner/acceptOrder", {
+    await this._orderClient!.acceptOrder({
       orderId,
       cryptoWalletAddress,
       externalId,
@@ -606,7 +495,7 @@ export class BrijPartnerClient {
   }
 
   async completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void> {
-    await this._orderClient!.post("/v1/partner/completeOrder", {
+    await this._orderClient!.completeOrder({
       orderId: orderId,
       transactionId: transactionId,
       externalId: externalId,
@@ -614,14 +503,14 @@ export class BrijPartnerClient {
   }
 
   async completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void> {
-    await this._orderClient!.post("/v1/partner/completeOrder", {
+    await this._orderClient!.completeOrder({
       orderId: orderId,
       externalId: externalId,
     });
   }
 
   async failOrder({ orderId, reason, externalId }: FailOrderParams): Promise<void> {
-    await this._orderClient!.post("/v1/partner/failOrder", {
+    await this._orderClient!.failOrder({
       orderId: orderId,
       reason: reason,
       externalId: externalId,
@@ -629,22 +518,22 @@ export class BrijPartnerClient {
   }
 
   async rejectOrder({ orderId, reason }: RejectOrderParams): Promise<void> {
-    await this._orderClient!.post("/v1/partner/rejectOrder", {
+    await this._orderClient!.rejectOrder({
       orderId: orderId,
       reason: reason,
     });
   }
 
   async updateFees(params: UpdateFeesParams): Promise<void> {
-    await this._orderClient!.post("/v1/partner/updateFees", params);
+    await this._orderClient!.updateFees(params);
   }
 
   async getUserInfo(publicKey: string) {
-    const response = await this._storageClient!.post("/v1/partner/getInfo", {
+    const response = await this._storageClient!.getInfo({
       publicKey: publicKey,
     });
 
-    return response.data;
+    return response;
   }
 
   async getUserSecretKey(publicKey: string) {
@@ -671,15 +560,14 @@ export class BrijPartnerClient {
   }
 
   async getKycStatusDetails(params: { userPK: string; country: string; secretKey: string }): Promise<KycStatusDetails> {
-    const response = await this._storageClient!.post("/v1/partner/getKycStatus", {
+    const response = await this._storageClient!.getKycStatus({
       userPublicKey: params.userPK,
       country: params.country,
       validatorPublicKey: this._verifierAuthPk,
     });
 
-    const buffer = response.data.data;
-    const uint8Array = naclUtil.decodeBase64(buffer);
-    const decoded = KycItemProto.decode(uint8Array);
+    const uint8Array = response.payload;
+    const decoded = protobuf.fromBinary(KycEnvelopeSchema, uint8Array);
 
     const secret = base58.decode(params.secretKey);
 
@@ -697,10 +585,11 @@ export class BrijPartnerClient {
       )
     );
 
+    const kycStatus = toKycStatus(decoded.status);
 
     const kycItem: KycItem = {
       countries: decoded.countries,
-      status: toKycStatus(decoded.status),
+      status: kycStatus,
       provider: decoded.provider,
       userPublicKey: decoded.userPublicKey,
       hashes: decoded.hashes,
@@ -708,9 +597,9 @@ export class BrijPartnerClient {
     };
 
     return {
-      status: response.data.status,
+      status: kycStatus,
       data: kycItem,
-      signature: response.data.signature,
+      signature: base58.encode(response.signature),
     };
   }
 
@@ -730,26 +619,6 @@ export class BrijPartnerClient {
     return decrypted;
   }
 
-  private static readonly currencyDecimals: Record<string, number> = {
-    // Crypto currencies
-    USDC: 6,
-    SOL: 9,
-    // Fiat currencies
-    USD: 2,
-    EUR: 2,
-    NGN: 2,
-  };
-
-  private convertToDecimalPrecision(amount: number, currency: string): string {
-    const decimals = BrijPartnerClient.currencyDecimals[currency];
-
-    if (decimals === undefined) {
-      throw new Error(`Unknown currency: ${currency}`);
-    }
-
-    return Math.round(amount * Math.pow(10, decimals)).toString();
-  }
-
   private createUserOnRampMessage({
     orderId,
     cryptoAmount,
@@ -765,8 +634,8 @@ export class BrijPartnerClient {
     fiatCurrency: string;
     cryptoWalletAddress: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 
@@ -789,8 +658,8 @@ export class BrijPartnerClient {
     encryptedBankAccount: string;
     cryptoWalletAddress: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}|${cryptoWalletAddress}`;
   }
 
@@ -811,8 +680,8 @@ export class BrijPartnerClient {
     encryptedBankName: string;
     encryptedBankAccount: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}`;
   }
 
@@ -831,23 +700,11 @@ export class BrijPartnerClient {
     fiatCurrency: string;
     cryptoWalletAddress: string;
   }): string {
-    const decimalCryptoAmount = this.convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = this.convertToDecimalPrecision(fiatAmount, fiatCurrency);
+    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
+    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
     return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 }
 
-function toKycStatus(protoStatus: number): KycStatus {
-  switch (protoStatus) {
-    case KycStatusProto.KYC_STATUS_UNSPECIFIED:
-      return KycStatus.Unspecified;
-    case KycStatusProto.KYC_STATUS_PENDING:
-      return KycStatus.Pending;
-    case KycStatusProto.KYC_STATUS_APPROVED:
-      return KycStatus.Approved;
-    case KycStatusProto.KYC_STATUS_REJECTED:
-      return KycStatus.Rejected;
-    default:
-      return KycStatus.Unspecified;
-  }
-}
+export { AppConfig };
+export * from "./models/models";
