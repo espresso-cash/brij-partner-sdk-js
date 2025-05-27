@@ -37,7 +37,6 @@ import {
   toValidationStatus,
   UpdateFeesParams,
   UserDataField,
-  ValidationResult,
   Order,
   RampType,
   KycStatusDetails,
@@ -45,7 +44,9 @@ import {
   toKycStatus,
 } from "./models/models";
 
-import { KycItemSchema } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_item_pb';
+import { KycEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_pb';
+import { ValidationDataEnvelope, ValidationDataEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/validation_data_pb';
+import { UserDataEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/user_data_pb';
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -155,15 +156,15 @@ export class BrijPartnerClient {
       includeValues,
     });
 
-    const validationMap = new Map<string, ValidationResult>(
-      response.validationData.map((data: { dataId: string; hash: string; status: number }) => [
-        data.dataId,
-        {
-          dataId: data.dataId,
-          value: data.hash,
-          status: toValidationStatus(data.status),
-        },
-      ])
+    const validationMap = new Map<string, ValidationDataEnvelope>(
+      response.validationData.map((data) => {
+        const validation = protobuf.fromBinary(ValidationDataEnvelopeSchema, data.payload);
+       
+        return [
+          validation.dataHash,
+          validation,
+        ];
+      })
     );
 
     const userData: UserData = {};
@@ -173,25 +174,25 @@ export class BrijPartnerClient {
     const bankInfoList: ({ bankName: string; accountNumber: string; bankCode: string; countryCode: string } & UserDataField)[] = [];
 
     for (const encrypted of response.userData) {
-      const decryptedData = encrypted.encryptedValue && encrypted.encryptedValue.length > 0
-        ? await this.decryptData(encrypted.encryptedValue, secret)
+      const user = protobuf.fromBinary(UserDataEnvelopeSchema, encrypted.payload);
+
+      const decryptedData = user.encryptedValue && user.encryptedValue.length > 0
+        ? await this.decryptData(user.encryptedValue, secret)
         : new Uint8Array(0);
 
-      const dataId = encrypted.id;
-      const verificationData = validationMap.get(dataId);
+      const hash = encrypted.hash;
+      const verificationData = validationMap.get(hash);
       const commonFields: UserDataField = {
-        dataId,
-        hash: encrypted.hash
+        hash: hash
       };
 
-      switch (encrypted.type) {
+      switch (user.type) {
         case DataType.EMAIL: {
           const data = protobuf.fromBinary(EmailSchema, decryptedData);
           userData.email = {
             value: data.value,
             ...commonFields,
-            ...commonFields,
-            status: verificationData?.status ?? ValidationStatus.Unspecified
+            status: toValidationStatus(verificationData?.status) ?? ValidationStatus.Unspecified
           };
           break;
         }
@@ -200,7 +201,7 @@ export class BrijPartnerClient {
           userData.phone = {
             value: data.value,
             ...commonFields,
-            status: verificationData?.status ?? ValidationStatus.Unspecified
+            status: toValidationStatus(verificationData?.status) ?? ValidationStatus.Unspecified
           };
           break;
         }
@@ -565,8 +566,8 @@ export class BrijPartnerClient {
       validatorPublicKey: this._verifierAuthPk,
     });
 
-    const uint8Array = response.data;
-    const decoded = protobuf.fromBinary(KycItemSchema, uint8Array);
+    const uint8Array = response.payload;
+    const decoded = protobuf.fromBinary(KycEnvelopeSchema, uint8Array);
 
     const secret = base58.decode(params.secretKey);
 

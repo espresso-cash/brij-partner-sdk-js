@@ -31,7 +31,7 @@ export type DataAccessParams = {
   includeValues?: boolean;
 };
 
-export type UserDataField = { dataId: string; hash: string };
+export type UserDataField = { hash: string };
 
 export type UserDataValueField<T> = { value: T } & UserDataField;
 
