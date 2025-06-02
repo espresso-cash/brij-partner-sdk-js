@@ -106,7 +106,6 @@ export type Order = {
   status: string;
   partnerPublicKey: string;
   userPublicKey: string;
-  comment: string;
   type: RampType;
   cryptoAmount: number;
   cryptoCurrency: string;
@@ -117,8 +116,8 @@ export type Order = {
   cryptoWalletAddress: string;
   transaction: string;
   transactionId: string;
-  userSignature?: string;
-  partnerSignature?: string;
+  userSignature?: Uint8Array;
+  partnerSignature?: Uint8Array;
   userWalletAddress?: string;
   walletPublicKey?: string;
 };

@@ -128,7 +128,6 @@ type Order = {
     status: string;
     partnerPublicKey: string;
     userPublicKey: string;
-    comment: string;
     type: RampType;
     cryptoAmount: number;
     cryptoCurrency: string;
@@ -139,8 +138,8 @@ type Order = {
     cryptoWalletAddress: string;
     transaction: string;
     transactionId: string;
-    userSignature?: string;
-    partnerSignature?: string;
+    userSignature?: Uint8Array;
+    partnerSignature?: Uint8Array;
     userWalletAddress?: string;
     walletPublicKey?: string;
 };
@@ -187,15 +186,12 @@ declare class BrijPartnerClient {
     private generateAuthToken;
     private createToken;
     getUserData({ userPK, secretKey, includeValues }: DataAccessParams): Promise<UserData>;
-    private decryptOrderFields;
     private processOrder;
     getOrder({ externalId, orderId }: OrderIds): Promise<Order>;
     getPartnerOrders(): Promise<Order[]>;
     private transformToOrder;
     private mapRampType;
-    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }: AcceptOnRampOrderParams & {
-        userSecretKey: string;
-    }): Promise<void>;
+    acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, }: AcceptOnRampOrderParams): Promise<void>;
     acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void>;
     completeOnRampOrder({ orderId, transactionId, externalId }: CompleteOnRampOrderParams): Promise<void>;
     completeOffRampOrder({ orderId, externalId }: OrderIds): Promise<void>;
@@ -210,10 +206,6 @@ declare class BrijPartnerClient {
         secretKey: string;
     }): Promise<KycStatusDetails>;
     private decryptData;
-    private createUserOnRampMessage;
-    private createUserOffRampMessage;
-    private createPartnerOnRampMessage;
-    private createPartnerOffRampMessage;
 }
 
 export { AppConfig, BrijPartnerClient, KycStatus, RampType, ValidationStatus, toKycStatus, toValidationStatus };

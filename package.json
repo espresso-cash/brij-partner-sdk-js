@@ -30,7 +30,7 @@
     "@connectrpc/connect": "^2.0.2",
     "@connectrpc/connect-node": "^2.0.2",
     "@connectrpc/connect-web": "^2.0.2",
-    "brij_protos_js": "^0.15.0",
+    "brij_protos_js": "^0.16.0",
     "axios": "^1.7.5",
     "bs58": "^6.0.0",
     "ed2curve": "^0.3.0",

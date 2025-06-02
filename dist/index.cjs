@@ -6191,30 +6191,13 @@ const RampType = /*@__PURE__*/
  * Describes the file brij/orders/v1/partner/partner.proto.
  */
 const file_brij_orders_v1_partner_partner = /*@__PURE__*/
-  fileDesc("CiRicmlqL29yZGVycy92MS9wYXJ0bmVyL3BhcnRuZXIucHJvdG8SFmJyaWoub3JkZXJzLnYxLnBhcnRuZXIiOAoPR2V0T3JkZXJSZXF1ZXN0EhAKCG9yZGVyX2lkGAEgASgJEhMKC2V4dGVybmFsX2lkGAIgASgJIosEChBHZXRPcmRlclJlc3BvbnNlEhAKCG9yZGVyX2lkGAEgASgJEg8KB2NyZWF0ZWQYAiABKAkSDgoGc3RhdHVzGAMgASgJEhoKEnBhcnRuZXJfcHVibGljX2tleRgEIAEoCRIXCg91c2VyX3B1YmxpY19rZXkYBSABKAkSDwoHY29tbWVudBgHIAEoCRItCgR0eXBlGAggASgOMh8uYnJpai5vcmRlcnMudjEuY29tbW9uLlJhbXBUeXBlEhUKDWNyeXB0b19hbW91bnQYCSABKAESFwoPY3J5cHRvX2N1cnJlbmN5GAogASgJEhMKC2ZpYXRfYW1vdW50GAsgASgBEhUKDWZpYXRfY3VycmVuY3kYDCABKAkSEQoJYmFua19uYW1lGA0gASgJEhQKDGJhbmtfYWNjb3VudBgOIAEoCRIdChVjcnlwdG9fd2FsbGV0X2FkZHJlc3MYDyABKAkSEwoLdHJhbnNhY3Rpb24YECABKAkSFgoOdHJhbnNhY3Rpb25faWQYESABKAkSEwoLZXh0ZXJuYWxfaWQYEiABKAkSFgoOdXNlcl9zaWduYXR1cmUYEyABKAkSGQoRcGFydG5lcl9zaWduYXR1cmUYFCABKAkSGwoTdXNlcl93YWxsZXRfYWRkcmVzcxgVIAEoCRIZChF3YWxsZXRfcHVibGljX2tleRgWIAEoCSKeAQoSQWNjZXB0T3JkZXJSZXF1ZXN0EhAKCG9yZGVyX2lkGAEgASgJEhEKCWJhbmtfbmFtZRgCIAEoCRIUCgxiYW5rX2FjY291bnQYAyABKAkSHQoVY3J5cHRvX3dhbGxldF9hZGRyZXNzGAQgASgJEhMKC2V4dGVybmFsX2lkGAUgASgJEhkKEXBhcnRuZXJfc2lnbmF0dXJlGAYgASgJIhUKE0FjY2VwdE9yZGVyUmVzcG9uc2UiNgoSUmVqZWN0T3JkZXJSZXF1ZXN0EhAKCG9yZGVyX2lkGAEgASgJEg4KBnJlYXNvbhgCIAEoCSIVChNSZWplY3RPcmRlclJlc3BvbnNlIlUKFENvbXBsZXRlT3JkZXJSZXF1ZXN0EhAKCG9yZGVyX2lkGAEgASgJEhYKDnRyYW5zYWN0aW9uX2lkGAIgASgJEhMKC2V4dGVybmFsX2lkGAMgASgJIhcKFUNvbXBsZXRlT3JkZXJSZXNwb25zZSJJChBGYWlsT3JkZXJSZXF1ZXN0EhAKCG9yZGVyX2lkGAEgASgJEg4KBnJlYXNvbhgCIAEoCRITCgtleHRlcm5hbF9pZBgDIAEoCSITChFGYWlsT3JkZXJSZXNwb25zZSISChBHZXRPcmRlcnNSZXF1ZXN0Ik0KEUdldE9yZGVyc1Jlc3BvbnNlEjgKBm9yZGVycxgBIAMoCzIoLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuR2V0T3JkZXJSZXNwb25zZSKsAQoRVXBkYXRlRmVlc1JlcXVlc3QSPgoLb25fcmFtcF9mZWUYASABKAsyKS5icmlqLm9yZGVycy52MS5wYXJ0bmVyLlJhbXBGZWVVcGRhdGVEYXRhEj8KDG9mZl9yYW1wX2ZlZRgCIAEoCzIpLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuUmFtcEZlZVVwZGF0ZURhdGESFgoOd2FsbGV0X2FkZHJlc3MYAyABKAkigAEKEVJhbXBGZWVVcGRhdGVEYXRhEhEKCWZpeGVkX2ZlZRgBIAEoARIWCg5wZXJjZW50YWdlX2ZlZRgCIAEoARJAChBjb252ZXJzaW9uX3JhdGVzGAMgASgLMiYuYnJpai5vcmRlcnMudjEucGFydG5lci5Db252ZXJzaW9uUmF0ZSJOCg5Db252ZXJzaW9uUmF0ZRIXCg9jcnlwdG9fY3VycmVuY3kYASABKAkSFQoNZmlhdF9jdXJyZW5jeRgCIAEoCRIMCgRyYXRlGAMgASgBIhQKElVwZGF0ZUZlZXNSZXNwb25zZSJjChpHZW5lcmF0ZVRyYW5zYWN0aW9uUmVxdWVzdBIQCghvcmRlcl9pZBgBIAEoCRIeChZmdW5kaW5nX3dhbGxldF9hZGRyZXNzGAIgASgJEhMKC2V4dGVybmFsX2lkGAMgASgJIjIKG0dlbmVyYXRlVHJhbnNhY3Rpb25SZXNwb25zZRITCgt0cmFuc2FjdGlvbhgBIAEoCTLWBgoOUGFydG5lclNlcnZpY2USXQoIR2V0T3JkZXISJy5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkdldE9yZGVyUmVxdWVzdBooLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuR2V0T3JkZXJSZXNwb25zZRJmCgtBY2NlcHRPcmRlchIqLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuQWNjZXB0T3JkZXJSZXF1ZXN0GisuYnJpai5vcmRlcnMudjEucGFydG5lci5BY2NlcHRPcmRlclJlc3BvbnNlEmYKC1JlamVjdE9yZGVyEiouYnJpai5vcmRlcnMudjEucGFydG5lci5SZWplY3RPcmRlclJlcXVlc3QaKy5icmlqLm9yZGVycy52MS5wYXJ0bmVyLlJlamVjdE9yZGVyUmVzcG9uc2USbAoNQ29tcGxldGVPcmRlchIsLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuQ29tcGxldGVPcmRlclJlcXVlc3QaLS5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkNvbXBsZXRlT3JkZXJSZXNwb25zZRJgCglGYWlsT3JkZXISKC5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkZhaWxPcmRlclJlcXVlc3QaKS5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkZhaWxPcmRlclJlc3BvbnNlEmAKCUdldE9yZGVycxIoLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuR2V0T3JkZXJzUmVxdWVzdBopLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuR2V0T3JkZXJzUmVzcG9uc2USYwoKVXBkYXRlRmVlcxIpLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuVXBkYXRlRmVlc1JlcXVlc3QaKi5icmlqLm9yZGVycy52MS5wYXJ0bmVyLlVwZGF0ZUZlZXNSZXNwb25zZRJ+ChNHZW5lcmF0ZVRyYW5zYWN0aW9uEjIuYnJpai5vcmRlcnMudjEucGFydG5lci5HZW5lcmF0ZVRyYW5zYWN0aW9uUmVxdWVzdBozLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuR2VuZXJhdGVUcmFuc2FjdGlvblJlc3BvbnNlQipaKGdvLmJyaWouZmkvcHJvdG9zL2JyaWovb3JkZXJzL3YxL3BhcnRuZXJiBnByb3RvMw", [file_brij_orders_v1_common_ramp_type]);
+  fileDesc("CiRicmlqL29yZGVycy92MS9wYXJ0bmVyL3BhcnRuZXIucHJvdG8SFmJyaWoub3JkZXJzLnYxLnBhcnRuZXIiOAoPR2V0T3JkZXJSZXF1ZXN0EhAKCG9yZGVyX2lkGAEgASgJEhMKC2V4dGVybmFsX2lkGAIgASgJIrsCChBHZXRPcmRlclJlc3BvbnNlEhQKDHVzZXJfcGF5bG9hZBgBIAEoDBIWCg51c2VyX3NpZ25hdHVyZRgCIAEoDBIXCg9wYXJ0bmVyX3BheWxvYWQYAyABKAwSGQoRcGFydG5lcl9zaWduYXR1cmUYBCABKAwSDwoHY3JlYXRlZBgFIAEoCRIOCgZzdGF0dXMYBiABKAkSFwoPdXNlcl9wdWJsaWNfa2V5GAcgASgJEhoKEnBhcnRuZXJfcHVibGljX2tleRgIIAEoCRItCgR0eXBlGAkgASgOMh8uYnJpai5vcmRlcnMudjEuY29tbW9uLlJhbXBUeXBlEhMKC3RyYW5zYWN0aW9uGAogASgJEhYKDnRyYW5zYWN0aW9uX2lkGAsgASgJEhMKC2V4dGVybmFsX2lkGAwgASgJIk0KEkFjY2VwdE9yZGVyUmVxdWVzdBIPCgdwYXlsb2FkGAEgASgMEhEKCXNpZ25hdHVyZRgCIAEoDBITCgtleHRlcm5hbF9pZBgDIAEoCSIVChNBY2NlcHRPcmRlclJlc3BvbnNlIjYKElJlamVjdE9yZGVyUmVxdWVzdBIQCghvcmRlcl9pZBgBIAEoCRIOCgZyZWFzb24YAiABKAkiFQoTUmVqZWN0T3JkZXJSZXNwb25zZSJVChRDb21wbGV0ZU9yZGVyUmVxdWVzdBIQCghvcmRlcl9pZBgBIAEoCRIWCg50cmFuc2FjdGlvbl9pZBgCIAEoCRITCgtleHRlcm5hbF9pZBgDIAEoCSIXChVDb21wbGV0ZU9yZGVyUmVzcG9uc2UiSQoQRmFpbE9yZGVyUmVxdWVzdBIQCghvcmRlcl9pZBgBIAEoCRIOCgZyZWFzb24YAiABKAkSEwoLZXh0ZXJuYWxfaWQYAyABKAkiEwoRRmFpbE9yZGVyUmVzcG9uc2UiEgoQR2V0T3JkZXJzUmVxdWVzdCJNChFHZXRPcmRlcnNSZXNwb25zZRI4CgZvcmRlcnMYASADKAsyKC5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkdldE9yZGVyUmVzcG9uc2UirAEKEVVwZGF0ZUZlZXNSZXF1ZXN0Ej4KC29uX3JhbXBfZmVlGAEgASgLMikuYnJpai5vcmRlcnMudjEucGFydG5lci5SYW1wRmVlVXBkYXRlRGF0YRI/CgxvZmZfcmFtcF9mZWUYAiABKAsyKS5icmlqLm9yZGVycy52MS5wYXJ0bmVyLlJhbXBGZWVVcGRhdGVEYXRhEhYKDndhbGxldF9hZGRyZXNzGAMgASgJIoABChFSYW1wRmVlVXBkYXRlRGF0YRIRCglmaXhlZF9mZWUYASABKAESFgoOcGVyY2VudGFnZV9mZWUYAiABKAESQAoQY29udmVyc2lvbl9yYXRlcxgDIAEoCzImLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuQ29udmVyc2lvblJhdGUiTgoOQ29udmVyc2lvblJhdGUSFwoPY3J5cHRvX2N1cnJlbmN5GAEgASgJEhUKDWZpYXRfY3VycmVuY3kYAiABKAkSDAoEcmF0ZRgDIAEoASIUChJVcGRhdGVGZWVzUmVzcG9uc2UiYwoaR2VuZXJhdGVUcmFuc2FjdGlvblJlcXVlc3QSEAoIb3JkZXJfaWQYASABKAkSHgoWZnVuZGluZ193YWxsZXRfYWRkcmVzcxgCIAEoCRITCgtleHRlcm5hbF9pZBgDIAEoCSIyChtHZW5lcmF0ZVRyYW5zYWN0aW9uUmVzcG9uc2USEwoLdHJhbnNhY3Rpb24YASABKAky1gYKDlBhcnRuZXJTZXJ2aWNlEl0KCEdldE9yZGVyEicuYnJpai5vcmRlcnMudjEucGFydG5lci5HZXRPcmRlclJlcXVlc3QaKC5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkdldE9yZGVyUmVzcG9uc2USZgoLQWNjZXB0T3JkZXISKi5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkFjY2VwdE9yZGVyUmVxdWVzdBorLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuQWNjZXB0T3JkZXJSZXNwb25zZRJmCgtSZWplY3RPcmRlchIqLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuUmVqZWN0T3JkZXJSZXF1ZXN0GisuYnJpai5vcmRlcnMudjEucGFydG5lci5SZWplY3RPcmRlclJlc3BvbnNlEmwKDUNvbXBsZXRlT3JkZXISLC5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkNvbXBsZXRlT3JkZXJSZXF1ZXN0Gi0uYnJpai5vcmRlcnMudjEucGFydG5lci5Db21wbGV0ZU9yZGVyUmVzcG9uc2USYAoJRmFpbE9yZGVyEiguYnJpai5vcmRlcnMudjEucGFydG5lci5GYWlsT3JkZXJSZXF1ZXN0GikuYnJpai5vcmRlcnMudjEucGFydG5lci5GYWlsT3JkZXJSZXNwb25zZRJgCglHZXRPcmRlcnMSKC5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkdldE9yZGVyc1JlcXVlc3QaKS5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkdldE9yZGVyc1Jlc3BvbnNlEmMKClVwZGF0ZUZlZXMSKS5icmlqLm9yZGVycy52MS5wYXJ0bmVyLlVwZGF0ZUZlZXNSZXF1ZXN0GiouYnJpai5vcmRlcnMudjEucGFydG5lci5VcGRhdGVGZWVzUmVzcG9uc2USfgoTR2VuZXJhdGVUcmFuc2FjdGlvbhIyLmJyaWoub3JkZXJzLnYxLnBhcnRuZXIuR2VuZXJhdGVUcmFuc2FjdGlvblJlcXVlc3QaMy5icmlqLm9yZGVycy52MS5wYXJ0bmVyLkdlbmVyYXRlVHJhbnNhY3Rpb25SZXNwb25zZUIqWihnby5icmlqLmZpL3Byb3Rvcy9icmlqL29yZGVycy92MS9wYXJ0bmVyYgZwcm90bzM", [file_brij_orders_v1_common_ramp_type]);
 
 /**
  * @generated from service brij.orders.v1.partner.PartnerService
  */
 const PartnerService = /*@__PURE__*/
   serviceDesc(file_brij_orders_v1_partner_partner, 0);
-
-const currencyDecimals = {
-    // Crypto currencies
-    USDC: 6,
-    SOL: 9,
-    // Fiat currencies
-    USD: 2,
-    EUR: 2,
-    NGN: 2,
-};
-function convertToDecimalPrecision(amount, currency) {
-    const decimals = currencyDecimals[currency];
-    if (decimals === undefined) {
-        throw new Error(`Unknown currency: ${currency}`);
-    }
-    return Math.round(amount * Math.pow(10, decimals)).toString();
-}
 
 // @generated by protoc-gen-es v2.4.0
 // @generated from file brij/storage/v1/common/kyc.proto (package brij.storage.v1.common, syntax proto3)
@@ -6295,6 +6278,45 @@ function toKycStatus(protoStatus) {
             return exports.KycStatus.Unspecified;
     }
 }
+
+// @generated by protoc-gen-es v2.4.0
+// @generated from file brij/orders/v1/common/envelopes.proto (package brij.orders.v1.common, syntax proto3)
+/* eslint-disable */
+
+
+/**
+ * Describes the file brij/orders/v1/common/envelopes.proto.
+ */
+const file_brij_orders_v1_common_envelopes = /*@__PURE__*/
+  fileDesc("CiVicmlqL29yZGVycy92MS9jb21tb24vZW52ZWxvcGVzLnByb3RvEhVicmlqLm9yZGVycy52MS5jb21tb24i2wEKF09uUmFtcE9yZGVyVXNlckVudmVsb3BlEhAKCG9yZGVyX2lkGAEgASgJEhoKEnBhcnRuZXJfcHVibGljX2tleRgCIAEoCRIVCg1jcnlwdG9fYW1vdW50GAMgASgBEhcKD2NyeXB0b19jdXJyZW5jeRgEIAEoCRITCgtmaWF0X2Ftb3VudBgFIAEoARIVCg1maWF0X2N1cnJlbmN5GAYgASgJEhsKE3VzZXJfd2FsbGV0X2FkZHJlc3MYCCABKAkSGQoRd2FsbGV0X3B1YmxpY19rZXkYCSABKAki9AEKGE9mZlJhbXBPcmRlclVzZXJFbnZlbG9wZRIQCghvcmRlcl9pZBgBIAEoCRIaChJwYXJ0bmVyX3B1YmxpY19rZXkYAiABKAkSFQoNY3J5cHRvX2Ftb3VudBgDIAEoARIXCg9jcnlwdG9fY3VycmVuY3kYBCABKAkSEwoLZmlhdF9hbW91bnQYBSABKAESFQoNZmlhdF9jdXJyZW5jeRgGIAEoCRIWCg5iYW5rX2RhdGFfaGFzaBgHIAEoCRIbChN1c2VyX3dhbGxldF9hZGRyZXNzGAggASgJEhkKEXdhbGxldF9wdWJsaWNfa2V5GAkgASgJIlcKGk9uUmFtcE9yZGVyUGFydG5lckVudmVsb3BlEhAKCG9yZGVyX2lkGAEgASgJEhEKCWJhbmtfbmFtZRgCIAEoCRIUCgxiYW5rX2FjY291bnQYAyABKAkiTgobT2ZmUmFtcE9yZGVyUGFydG5lckVudmVsb3BlEhAKCG9yZGVyX2lkGAEgASgJEh0KFWNyeXB0b193YWxsZXRfYWRkcmVzcxgCIAEoCUIpWidnby5icmlqLmZpL3Byb3Rvcy9icmlqL29yZGVycy92MS9jb21tb25iBnByb3RvMw");
+
+/**
+ * Describes the message brij.orders.v1.common.OnRampOrderUserEnvelope.
+ * Use `create(OnRampOrderUserEnvelopeSchema)` to create a new message.
+ */
+const OnRampOrderUserEnvelopeSchema = /*@__PURE__*/
+  messageDesc(file_brij_orders_v1_common_envelopes, 0);
+
+/**
+ * Describes the message brij.orders.v1.common.OffRampOrderUserEnvelope.
+ * Use `create(OffRampOrderUserEnvelopeSchema)` to create a new message.
+ */
+const OffRampOrderUserEnvelopeSchema = /*@__PURE__*/
+  messageDesc(file_brij_orders_v1_common_envelopes, 1);
+
+/**
+ * Describes the message brij.orders.v1.common.OnRampOrderPartnerEnvelope.
+ * Use `create(OnRampOrderPartnerEnvelopeSchema)` to create a new message.
+ */
+const OnRampOrderPartnerEnvelopeSchema = /*@__PURE__*/
+  messageDesc(file_brij_orders_v1_common_envelopes, 2);
+
+/**
+ * Describes the message brij.orders.v1.common.OffRampOrderPartnerEnvelope.
+ * Use `create(OffRampOrderPartnerEnvelopeSchema)` to create a new message.
+ */
+const OffRampOrderPartnerEnvelopeSchema = /*@__PURE__*/
+  messageDesc(file_brij_orders_v1_common_envelopes, 3);
 
 class BrijPartnerClient {
     authKeyPair;
@@ -6479,73 +6501,19 @@ class BrijPartnerClient {
         }
         return userData;
     }
-    async decryptOrderFields(order, secretKey) {
-        const decryptField = async (field) => {
-            if (!field)
-                return "";
-            try {
-                const encryptedData = naclUtil__default.default.decodeBase64(field);
-                return new TextDecoder().decode(await this.decryptData(encryptedData, secretKey));
-            }
-            catch {
-                return field;
-            }
-        };
-        return {
-            ...order,
-            bankAccount: await decryptField(order.bankAccount),
-            bankName: await decryptField(order.bankName),
-        };
-    }
-    async processOrder(order, secretKey) {
-        const decryptedOrder = await this.decryptOrderFields(order, secretKey);
+    async processOrder(order) {
+        const decryptedOrder = order;
         if (order.userSignature) {
             const userVerifyKey = base58__default.default.decode(order.userPublicKey);
-            const userMessage = order.type === RampType.ON_RAMP
-                ? this.createUserOnRampMessage({
-                    orderId: order.orderId,
-                    cryptoAmount: order.cryptoAmount,
-                    cryptoCurrency: order.cryptoCurrency,
-                    fiatAmount: order.fiatAmount,
-                    fiatCurrency: order.fiatCurrency,
-                    cryptoWalletAddress: order.userWalletAddress ?? "",
-                })
-                : this.createUserOffRampMessage({
-                    orderId: order.orderId,
-                    cryptoAmount: order.cryptoAmount,
-                    cryptoCurrency: order.cryptoCurrency,
-                    fiatAmount: order.fiatAmount,
-                    fiatCurrency: order.fiatCurrency,
-                    encryptedBankName: order.bankName,
-                    encryptedBankAccount: order.bankAccount,
-                    cryptoWalletAddress: order.userWalletAddress ?? "",
-                });
-            const isValidUserSig = nacl__default.default.sign.detached.verify(new TextEncoder().encode(userMessage), base58__default.default.decode(order.userSignature), userVerifyKey);
+            const isValidUserSig = nacl__default.default.sign.detached.verify(order.userPayload, order.userSignature, userVerifyKey);
             if (!isValidUserSig) {
                 throw new Error("Invalid user signature");
             }
         }
         if (order.partnerSignature) {
             const partnerVerifyKey = base58__default.default.decode(order.partnerPublicKey);
-            const partnerMessage = order.type === RampType.ON_RAMP
-                ? this.createPartnerOnRampMessage({
-                    orderId: order.orderId,
-                    cryptoAmount: order.cryptoAmount,
-                    cryptoCurrency: order.cryptoCurrency,
-                    fiatAmount: order.fiatAmount,
-                    fiatCurrency: order.fiatCurrency,
-                    encryptedBankName: order.bankName,
-                    encryptedBankAccount: order.bankAccount,
-                })
-                : this.createPartnerOffRampMessage({
-                    orderId: order.orderId,
-                    cryptoAmount: order.cryptoAmount,
-                    cryptoCurrency: order.cryptoCurrency,
-                    fiatAmount: order.fiatAmount,
-                    fiatCurrency: order.fiatCurrency,
-                    cryptoWalletAddress: order.cryptoWalletAddress,
-                });
-            const isValidPartnerSig = nacl__default.default.sign.detached.verify(new TextEncoder().encode(partnerMessage), base58__default.default.decode(order.partnerSignature), partnerVerifyKey);
+            base58__default.default.decode(order.userPublicKey);
+            const isValidPartnerSig = nacl__default.default.sign.detached.verify(order.partnerPayload, order.partnerSignature, partnerVerifyKey);
             if (!isValidPartnerSig) {
                 throw new Error("Invalid partner signature");
             }
@@ -6557,8 +6525,7 @@ class BrijPartnerClient {
             orderId,
             externalId,
         });
-        const secretKey = await this.getUserSecretKey(response.userPublicKey);
-        const processedOrder = await this.processOrder(response, base58__default.default.decode(secretKey));
+        const processedOrder = await this.processOrder(response);
         return this.transformToOrder(processedOrder);
     }
     async getPartnerOrders() {
@@ -6566,8 +6533,7 @@ class BrijPartnerClient {
         const partnerOrders = [];
         for (const order of response.orders) {
             try {
-                const secretKey = await this.getUserSecretKey(order.userPublicKey);
-                const processedOrder = await this.processOrder(order, base58__default.default.decode(secretKey));
+                const processedOrder = await this.processOrder(order);
                 partnerOrders.push(this.transformToOrder(processedOrder));
             }
             catch {
@@ -6577,29 +6543,63 @@ class BrijPartnerClient {
         return partnerOrders;
     }
     transformToOrder(orderResponse) {
-        return {
-            orderId: orderResponse.orderId,
-            externalId: orderResponse.externalId || undefined,
-            created: orderResponse.created,
-            status: orderResponse.status,
-            partnerPublicKey: orderResponse.partnerPublicKey,
-            userPublicKey: orderResponse.userPublicKey,
-            comment: orderResponse.comment,
-            type: this.mapRampType(orderResponse.type),
-            cryptoAmount: orderResponse.cryptoAmount,
-            cryptoCurrency: orderResponse.cryptoCurrency,
-            fiatAmount: orderResponse.fiatAmount,
-            fiatCurrency: orderResponse.fiatCurrency,
-            bankName: orderResponse.bankName,
-            bankAccount: orderResponse.bankAccount,
-            cryptoWalletAddress: orderResponse.cryptoWalletAddress,
-            transaction: orderResponse.transaction,
-            transactionId: orderResponse.transactionId,
-            userSignature: orderResponse.userSignature || undefined,
-            partnerSignature: orderResponse.partnerSignature || undefined,
-            userWalletAddress: orderResponse.userWalletAddress || undefined,
-            walletPublicKey: orderResponse.walletPublicKey || undefined,
-        };
+        switch (orderResponse.type) {
+            case RampType.ON_RAMP: {
+                const userEnvelope = protobuf__namespace.fromBinary(OnRampOrderUserEnvelopeSchema, orderResponse.userPayload);
+                const partnerEnvelope = protobuf__namespace.fromBinary(OnRampOrderPartnerEnvelopeSchema, orderResponse.partnerPayload);
+                return {
+                    orderId: userEnvelope.orderId,
+                    externalId: orderResponse.externalId || undefined,
+                    created: orderResponse.created,
+                    status: orderResponse.status,
+                    partnerPublicKey: orderResponse.partnerPublicKey,
+                    userPublicKey: orderResponse.userPublicKey,
+                    type: this.mapRampType(orderResponse.type),
+                    cryptoAmount: userEnvelope.cryptoAmount,
+                    cryptoCurrency: userEnvelope.cryptoCurrency,
+                    fiatAmount: userEnvelope.fiatAmount,
+                    fiatCurrency: userEnvelope.fiatCurrency,
+                    bankName: partnerEnvelope.bankName,
+                    bankAccount: partnerEnvelope.bankAccount,
+                    cryptoWalletAddress: "",
+                    transaction: orderResponse.transaction,
+                    transactionId: orderResponse.transactionId,
+                    userSignature: orderResponse.userSignature || undefined,
+                    partnerSignature: orderResponse.partnerSignature || undefined,
+                    userWalletAddress: userEnvelope.userWalletAddress || undefined,
+                    walletPublicKey: userEnvelope.walletPublicKey || undefined,
+                };
+            }
+            case RampType.OFF_RAMP: {
+                const userEnvelope = protobuf__namespace.fromBinary(OffRampOrderUserEnvelopeSchema, orderResponse.userPayload);
+                const partnerEnvelope = protobuf__namespace.fromBinary(OffRampOrderPartnerEnvelopeSchema, orderResponse.partnerPayload);
+                return {
+                    orderId: userEnvelope.orderId,
+                    externalId: orderResponse.externalId || undefined,
+                    created: orderResponse.created,
+                    status: orderResponse.status,
+                    partnerPublicKey: orderResponse.partnerPublicKey,
+                    userPublicKey: orderResponse.userPublicKey,
+                    type: this.mapRampType(orderResponse.type),
+                    cryptoAmount: userEnvelope.cryptoAmount,
+                    cryptoCurrency: userEnvelope.cryptoCurrency,
+                    fiatAmount: userEnvelope.fiatAmount,
+                    fiatCurrency: userEnvelope.fiatCurrency,
+                    bankName: "",
+                    bankAccount: "",
+                    cryptoWalletAddress: partnerEnvelope.cryptoWalletAddress,
+                    transaction: orderResponse.transaction,
+                    transactionId: orderResponse.transactionId,
+                    userSignature: orderResponse.userSignature || undefined,
+                    partnerSignature: orderResponse.partnerSignature || undefined,
+                    userWalletAddress: userEnvelope.userWalletAddress || undefined,
+                    walletPublicKey: userEnvelope.walletPublicKey || undefined,
+                };
+            }
+            default: {
+                throw new Error("Invalid order type");
+            }
+        }
     }
     mapRampType(protoRampType) {
         switch (protoRampType) {
@@ -6613,52 +6613,33 @@ class BrijPartnerClient {
                 return exports.RampType.Unspecified;
         }
     }
-    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, userSecretKey, }) {
-        const key = base58__default.default.decode(userSecretKey);
-        const order = await this.getOrder({ orderId });
-        const encryptField = (value) => {
-            const nonce = nacl__default.default.randomBytes(nacl__default.default.secretbox.nonceLength);
-            const ciphertext = nacl__default.default.secretbox(naclUtil__default.default.decodeUTF8(value), nonce, key);
-            return naclUtil__default.default.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
-        };
-        const encryptedBankName = encryptField(bankName);
-        const encryptedBankAccount = encryptField(bankAccount);
-        const signatureMessage = this.createPartnerOnRampMessage({
-            orderId: order.orderId,
-            cryptoAmount: order.cryptoAmount,
-            cryptoCurrency: order.cryptoCurrency,
-            fiatAmount: order.fiatAmount,
-            fiatCurrency: order.fiatCurrency,
-            encryptedBankName: encryptedBankName,
-            encryptedBankAccount: encryptedBankAccount,
+    async acceptOnRampOrder({ orderId, bankName, bankAccount, externalId, }) {
+        const partnerEnvelope = protobuf__namespace.create(OnRampOrderPartnerEnvelopeSchema, {
+            orderId: orderId,
+            bankName: bankName,
+            bankAccount: bankAccount,
         });
+        const partnerPayload = protobuf__namespace.toBinary(OnRampOrderPartnerEnvelopeSchema, partnerEnvelope);
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-        const signature = nacl__default.default.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+        const signature = nacl__default.default.sign.detached(partnerPayload, privateKeyBytes);
         await this._orderClient.acceptOrder({
-            orderId,
-            bankName: encryptedBankName,
-            bankAccount: encryptedBankAccount,
-            externalId,
-            partnerSignature: base58__default.default.encode(signature),
+            payload: partnerPayload,
+            signature: signature,
+            externalId: externalId,
         });
     }
     async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }) {
-        const order = await this.getOrder({ orderId });
-        const signatureMessage = this.createPartnerOffRampMessage({
-            orderId: order.orderId,
-            cryptoAmount: order.cryptoAmount,
-            cryptoCurrency: order.cryptoCurrency,
-            fiatAmount: order.fiatAmount,
-            fiatCurrency: order.fiatCurrency,
-            cryptoWalletAddress,
+        const partnerEnvelope = protobuf__namespace.create(OffRampOrderPartnerEnvelopeSchema, {
+            orderId: orderId,
+            cryptoWalletAddress: cryptoWalletAddress,
         });
+        const partnerPayload = protobuf__namespace.toBinary(OffRampOrderPartnerEnvelopeSchema, partnerEnvelope);
         const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-        const signature = nacl__default.default.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+        const signature = nacl__default.default.sign.detached(partnerPayload, privateKeyBytes);
         await this._orderClient.acceptOrder({
-            orderId,
-            cryptoWalletAddress,
-            externalId,
-            partnerSignature: base58__default.default.encode(signature),
+            payload: partnerPayload,
+            signature: signature,
+            externalId: externalId,
         });
     }
     async completeOnRampOrder({ orderId, transactionId, externalId }) {
@@ -6754,26 +6735,6 @@ class BrijPartnerClient {
             throw new Error("Unable to decrypt data");
         }
         return decrypted;
-    }
-    createUserOnRampMessage({ orderId, cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, cryptoWalletAddress, }) {
-        const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-        const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-        return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
-    }
-    createUserOffRampMessage({ orderId, cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, encryptedBankName, encryptedBankAccount, cryptoWalletAddress, }) {
-        const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-        const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-        return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}|${cryptoWalletAddress}`;
-    }
-    createPartnerOnRampMessage({ orderId, cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, encryptedBankName, encryptedBankAccount, }) {
-        const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-        const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-        return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}`;
-    }
-    createPartnerOffRampMessage({ orderId, cryptoAmount, cryptoCurrency, fiatAmount, fiatCurrency, cryptoWalletAddress, }) {
-        const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-        const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-        return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
     }
 }
 
