@@ -23,7 +23,6 @@ import {
 } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 
 import { RampType as ProtoRampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
-import { convertToDecimalPrecision } from "./utils/currency";
 import {
   OrderIds,
   CompleteOnRampOrderParams,
@@ -47,6 +46,7 @@ import {
 import { KycEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/kyc_pb';
 import { ValidationDataEnvelope, ValidationDataEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/validation_data_pb';
 import { UserDataEnvelopeSchema } from 'brij_protos_js/gen/brij/storage/v1/common/user_data_pb';
+import { OnRampOrderUserEnvelopeSchema, OffRampOrderUserEnvelopeSchema, OnRampOrderPartnerEnvelopeSchema, OffRampOrderPartnerEnvelopeSchema, OffRampOrderPartnerEnvelope, OnRampOrderPartnerEnvelope } from 'brij_protos_js/gen/brij/orders/v1/common/envelopes_pb';
 
 interface AuthKeyPair {
   getPrivateKeyBytes(): Promise<Uint8Array>;
@@ -159,7 +159,7 @@ export class BrijPartnerClient {
     const validationMap = new Map<string, ValidationDataEnvelope>(
       response.validationData.map((data) => {
         const validation = protobuf.fromBinary(ValidationDataEnvelopeSchema, data.payload);
-       
+
         return [
           validation.dataHash,
           validation,
@@ -272,53 +272,15 @@ export class BrijPartnerClient {
     return userData;
   }
 
-  private async decryptOrderFields(order: GetOrderResponse, secretKey: Uint8Array): Promise<GetOrderResponse> {
-    const decryptField = async (field: string | undefined) => {
-      if (!field) return "";
-      try {
-        const encryptedData = naclUtil.decodeBase64(field);
-        return new TextDecoder().decode(await this.decryptData(encryptedData, secretKey));
-      } catch {
-        return field;
-      }
-    };
+  private async processOrder(order: GetOrderResponse): Promise<GetOrderResponse> {
+    const decryptedOrder = order;
 
-    return {
-      ...order,
-      bankAccount: await decryptField(order.bankAccount),
-      bankName: await decryptField(order.bankName),
-    };
-  }
-
-  private async processOrder(order: GetOrderResponse, secretKey: Uint8Array): Promise<GetOrderResponse> {
-    const decryptedOrder = await this.decryptOrderFields(order, secretKey);
-
-    if (order.userSignature) {
+    if (order.userSignature && order.userSignature.length > 0) {
       const userVerifyKey = base58.decode(order.userPublicKey);
-      const userMessage =
-        order.type === ProtoRampType.ON_RAMP
-          ? this.createUserOnRampMessage({
-            orderId: order.orderId,
-            cryptoAmount: order.cryptoAmount,
-            cryptoCurrency: order.cryptoCurrency,
-            fiatAmount: order.fiatAmount,
-            fiatCurrency: order.fiatCurrency,
-            cryptoWalletAddress: order.userWalletAddress ?? "",
-          })
-          : this.createUserOffRampMessage({
-            orderId: order.orderId,
-            cryptoAmount: order.cryptoAmount,
-            cryptoCurrency: order.cryptoCurrency,
-            fiatAmount: order.fiatAmount,
-            fiatCurrency: order.fiatCurrency,
-            encryptedBankName: order.bankName,
-            encryptedBankAccount: order.bankAccount,
-            cryptoWalletAddress: order.userWalletAddress ?? "",
-          });
 
       const isValidUserSig = nacl.sign.detached.verify(
-        new TextEncoder().encode(userMessage),
-        base58.decode(order.userSignature),
+        order.userPayload,
+        order.userSignature,
         userVerifyKey
       );
 
@@ -327,31 +289,12 @@ export class BrijPartnerClient {
       }
     }
 
-    if (order.partnerSignature) {
+    if (order.partnerSignature && order.partnerSignature.length > 0) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
-      const partnerMessage =
-        order.type === ProtoRampType.ON_RAMP
-          ? this.createPartnerOnRampMessage({
-            orderId: order.orderId,
-            cryptoAmount: order.cryptoAmount,
-            cryptoCurrency: order.cryptoCurrency,
-            fiatAmount: order.fiatAmount,
-            fiatCurrency: order.fiatCurrency,
-            encryptedBankName: order.bankName,
-            encryptedBankAccount: order.bankAccount,
-          })
-          : this.createPartnerOffRampMessage({
-            orderId: order.orderId,
-            cryptoAmount: order.cryptoAmount,
-            cryptoCurrency: order.cryptoCurrency,
-            fiatAmount: order.fiatAmount,
-            fiatCurrency: order.fiatCurrency,
-            cryptoWalletAddress: order.cryptoWalletAddress,
-          });
 
       const isValidPartnerSig = nacl.sign.detached.verify(
-        new TextEncoder().encode(partnerMessage),
-        base58.decode(order.partnerSignature),
+        order.partnerPayload,
+        order.partnerSignature,
         partnerVerifyKey
       );
 
@@ -369,8 +312,7 @@ export class BrijPartnerClient {
       externalId,
     });
 
-    const secretKey = await this.getUserSecretKey(response.userPublicKey);
-    const processedOrder = await this.processOrder(response, base58.decode(secretKey));
+    const processedOrder = await this.processOrder(response);
     return this.transformToOrder(processedOrder);
   }
 
@@ -380,8 +322,7 @@ export class BrijPartnerClient {
 
     for (const order of response.orders) {
       try {
-        const secretKey = await this.getUserSecretKey(order.userPublicKey);
-        const processedOrder = await this.processOrder(order, base58.decode(secretKey));
+        const processedOrder = await this.processOrder(order);
         partnerOrders.push(this.transformToOrder(processedOrder));
       } catch {
         continue;
@@ -392,29 +333,65 @@ export class BrijPartnerClient {
   }
 
   private transformToOrder(orderResponse: GetOrderResponse): Order {
-    return {
-      orderId: orderResponse.orderId,
-      externalId: orderResponse.externalId || undefined,
-      created: orderResponse.created,
-      status: orderResponse.status,
-      partnerPublicKey: orderResponse.partnerPublicKey,
-      userPublicKey: orderResponse.userPublicKey,
-      comment: orderResponse.comment,
-      type: this.mapRampType(orderResponse.type),
-      cryptoAmount: orderResponse.cryptoAmount,
-      cryptoCurrency: orderResponse.cryptoCurrency,
-      fiatAmount: orderResponse.fiatAmount,
-      fiatCurrency: orderResponse.fiatCurrency,
-      bankName: orderResponse.bankName,
-      bankAccount: orderResponse.bankAccount,
-      cryptoWalletAddress: orderResponse.cryptoWalletAddress,
-      transaction: orderResponse.transaction,
-      transactionId: orderResponse.transactionId,
-      userSignature: orderResponse.userSignature || undefined,
-      partnerSignature: orderResponse.partnerSignature || undefined,
-      userWalletAddress: orderResponse.userWalletAddress || undefined,
-      walletPublicKey: orderResponse.walletPublicKey || undefined,
-    };
+    switch (orderResponse.type) {
+      case ProtoRampType.ON_RAMP: {
+        const userEnvelope = protobuf.fromBinary(OnRampOrderUserEnvelopeSchema, orderResponse.userPayload);
+        const partnerEnvelope = protobuf.fromBinary(OnRampOrderPartnerEnvelopeSchema, orderResponse.partnerPayload);
+
+        return {
+          orderId: userEnvelope.orderId,
+          externalId: orderResponse.externalId || undefined,
+          created: orderResponse.created,
+          status: orderResponse.status,
+          partnerPublicKey: orderResponse.partnerPublicKey,
+          userPublicKey: orderResponse.userPublicKey,
+          type: this.mapRampType(orderResponse.type),
+          cryptoAmount: userEnvelope.cryptoAmount,
+          cryptoCurrency: userEnvelope.cryptoCurrency,
+          fiatAmount: userEnvelope.fiatAmount,
+          fiatCurrency: userEnvelope.fiatCurrency,
+          bankName: partnerEnvelope.bankName,
+          bankAccount: partnerEnvelope.bankAccount,
+          cryptoWalletAddress: "",
+          transaction: orderResponse.transaction,
+          transactionId: orderResponse.transactionId,
+          userSignature: orderResponse.userSignature || undefined,
+          partnerSignature: orderResponse.partnerSignature || undefined,
+          userWalletAddress: userEnvelope.userWalletAddress || undefined,
+          walletPublicKey: userEnvelope.walletPublicKey || undefined,
+        };
+      }
+      case ProtoRampType.OFF_RAMP: {
+        const userEnvelope = protobuf.fromBinary(OffRampOrderUserEnvelopeSchema, orderResponse.userPayload);
+        const partnerEnvelope = protobuf.fromBinary(OffRampOrderPartnerEnvelopeSchema, orderResponse.partnerPayload);
+
+        return {
+          orderId: userEnvelope.orderId,
+          externalId: orderResponse.externalId || undefined,
+          created: orderResponse.created,
+          status: orderResponse.status,
+          partnerPublicKey: orderResponse.partnerPublicKey,
+          userPublicKey: orderResponse.userPublicKey,
+          type: this.mapRampType(orderResponse.type),
+          cryptoAmount: userEnvelope.cryptoAmount,
+          cryptoCurrency: userEnvelope.cryptoCurrency,
+          fiatAmount: userEnvelope.fiatAmount,
+          fiatCurrency: userEnvelope.fiatCurrency,
+          bankName: "",
+          bankAccount: "",
+          cryptoWalletAddress: partnerEnvelope.cryptoWalletAddress,
+          transaction: orderResponse.transaction,
+          transactionId: orderResponse.transactionId,
+          userSignature: orderResponse.userSignature || undefined,
+          partnerSignature: orderResponse.partnerSignature || undefined,
+          userWalletAddress: userEnvelope.userWalletAddress || undefined,
+          walletPublicKey: userEnvelope.walletPublicKey || undefined,
+        };
+      }
+      default: {
+        throw new Error("Invalid order type");
+      }
+    }
   }
 
   private mapRampType(protoRampType: ProtoRampType): RampType {
@@ -435,62 +412,40 @@ export class BrijPartnerClient {
     bankName,
     bankAccount,
     externalId,
-    userSecretKey,
-  }: AcceptOnRampOrderParams & { userSecretKey: string }): Promise<void> {
-    const key = base58.decode(userSecretKey);
-    const order = await this.getOrder({ orderId });
-
-    const encryptField = (value: string) => {
-      const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-      const ciphertext = nacl.secretbox(naclUtil.decodeUTF8(value), nonce, key);
-      return naclUtil.encodeBase64(new Uint8Array([...nonce, ...ciphertext]));
-    };
-
-    const encryptedBankName = encryptField(bankName);
-    const encryptedBankAccount = encryptField(bankAccount);
-
-    const signatureMessage = this.createPartnerOnRampMessage({
-      orderId: order.orderId,
-      cryptoAmount: order.cryptoAmount,
-      cryptoCurrency: order.cryptoCurrency,
-      fiatAmount: order.fiatAmount,
-      fiatCurrency: order.fiatCurrency,
-      encryptedBankName: encryptedBankName,
-      encryptedBankAccount: encryptedBankAccount,
+  }: AcceptOnRampOrderParams): Promise<void> {
+    const partnerEnvelope = protobuf.create(OnRampOrderPartnerEnvelopeSchema, {
+      orderId: orderId,
+      bankName: bankName,
+      bankAccount: bankAccount,
     });
 
+    const partnerPayload = protobuf.toBinary(OnRampOrderPartnerEnvelopeSchema, partnerEnvelope);
+
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-    const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+    const signature = nacl.sign.detached(partnerPayload, privateKeyBytes);
 
     await this._orderClient!.acceptOrder({
-      orderId,
-      bankName: encryptedBankName,
-      bankAccount: encryptedBankAccount,
-      externalId,
-      partnerSignature: base58.encode(signature),
+      payload: partnerPayload,
+      signature: signature,
+      externalId: externalId,
     });
   }
 
   async acceptOffRampOrder({ orderId, cryptoWalletAddress, externalId }: AcceptOffRampOrderParams): Promise<void> {
-    const order = await this.getOrder({ orderId });
-
-    const signatureMessage = this.createPartnerOffRampMessage({
-      orderId: order.orderId,
-      cryptoAmount: order.cryptoAmount,
-      cryptoCurrency: order.cryptoCurrency,
-      fiatAmount: order.fiatAmount,
-      fiatCurrency: order.fiatCurrency,
-      cryptoWalletAddress,
+    const partnerEnvelope = protobuf.create(OffRampOrderPartnerEnvelopeSchema, {
+      orderId: orderId,
+      cryptoWalletAddress: cryptoWalletAddress,
     });
 
+    const partnerPayload = protobuf.toBinary(OffRampOrderPartnerEnvelopeSchema, partnerEnvelope);
+
     const privateKeyBytes = await this.authKeyPair.getPrivateKeyBytes();
-    const signature = nacl.sign.detached(new TextEncoder().encode(signatureMessage), privateKeyBytes);
+    const signature = nacl.sign.detached(partnerPayload, privateKeyBytes);
 
     await this._orderClient!.acceptOrder({
-      orderId,
-      cryptoWalletAddress,
-      externalId,
-      partnerSignature: base58.encode(signature),
+      payload: partnerPayload,
+      signature: signature,
+      externalId: externalId,
     });
   }
 
@@ -617,92 +572,6 @@ export class BrijPartnerClient {
     }
 
     return decrypted;
-  }
-
-  private createUserOnRampMessage({
-    orderId,
-    cryptoAmount,
-    cryptoCurrency,
-    fiatAmount,
-    fiatCurrency,
-    cryptoWalletAddress,
-  }: {
-    orderId: string;
-    cryptoAmount: number;
-    cryptoCurrency: string;
-    fiatAmount: number;
-    fiatCurrency: string;
-    cryptoWalletAddress: string;
-  }): string {
-    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
-  }
-
-  private createUserOffRampMessage({
-    orderId,
-    cryptoAmount,
-    cryptoCurrency,
-    fiatAmount,
-    fiatCurrency,
-    encryptedBankName,
-    encryptedBankAccount,
-    cryptoWalletAddress,
-  }: {
-    orderId: string;
-    cryptoAmount: number;
-    cryptoCurrency: string;
-    fiatAmount: number;
-    fiatCurrency: string;
-    encryptedBankName: string;
-    encryptedBankAccount: string;
-    cryptoWalletAddress: string;
-  }): string {
-    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}|${cryptoWalletAddress}`;
-  }
-
-  private createPartnerOnRampMessage({
-    orderId,
-    cryptoAmount,
-    cryptoCurrency,
-    fiatAmount,
-    fiatCurrency,
-    encryptedBankName,
-    encryptedBankAccount,
-  }: {
-    orderId: string;
-    cryptoAmount: number;
-    cryptoCurrency: string;
-    fiatAmount: number;
-    fiatCurrency: string;
-    encryptedBankName: string;
-    encryptedBankAccount: string;
-  }): string {
-    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${encryptedBankName}|${encryptedBankAccount}`;
-  }
-
-  private createPartnerOffRampMessage({
-    orderId,
-    cryptoAmount,
-    cryptoCurrency,
-    fiatAmount,
-    fiatCurrency,
-    cryptoWalletAddress,
-  }: {
-    orderId: string;
-    cryptoAmount: number;
-    cryptoCurrency: string;
-    fiatAmount: number;
-    fiatCurrency: string;
-    cryptoWalletAddress: string;
-  }): string {
-    const decimalCryptoAmount = convertToDecimalPrecision(cryptoAmount, cryptoCurrency);
-    const decimalFiatAmount = convertToDecimalPrecision(fiatAmount, fiatCurrency);
-    return `${orderId}|${decimalCryptoAmount}|${cryptoCurrency}|${decimalFiatAmount}|${fiatCurrency}|${cryptoWalletAddress}`;
   }
 }
 
