@@ -6485,7 +6485,6 @@ class BrijPartnerClient {
         }
         if (order.partnerSignature) {
             const partnerVerifyKey = base58.decode(order.partnerPublicKey);
-            base58.decode(order.userPublicKey);
             const isValidPartnerSig = nacl.sign.detached.verify(order.partnerPayload, order.partnerSignature, partnerVerifyKey);
             if (!isValidPartnerSig) {
                 throw new Error("Invalid partner signature");

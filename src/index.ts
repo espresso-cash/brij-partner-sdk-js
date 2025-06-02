@@ -293,8 +293,6 @@ export class BrijPartnerClient {
     if (order.partnerSignature) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
 
-      const userVerifyKey = base58.decode(order.userPublicKey);
-
       const isValidPartnerSig = nacl.sign.detached.verify(
         order.partnerPayload,
         order.partnerSignature,
