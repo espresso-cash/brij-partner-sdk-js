@@ -23,7 +23,6 @@ import {
 } from 'brij_protos_js/gen/brij/storage/v1/common/data_pb';
 
 import { RampType as ProtoRampType } from "brij_protos_js/gen/brij/orders/v1/common/ramp_type_pb";
-import { convertToDecimalPrecision } from "./utils/currency";
 import {
   OrderIds,
   CompleteOnRampOrderParams,
@@ -276,7 +275,7 @@ export class BrijPartnerClient {
   private async processOrder(order: GetOrderResponse): Promise<GetOrderResponse> {
     const decryptedOrder = order;
 
-    if (order.userSignature) {
+    if (order.userSignature && order.userSignature.length > 0) {
       const userVerifyKey = base58.decode(order.userPublicKey);
 
       const isValidUserSig = nacl.sign.detached.verify(
@@ -290,7 +289,7 @@ export class BrijPartnerClient {
       }
     }
 
-    if (order.partnerSignature) {
+    if (order.partnerSignature && order.partnerSignature.length > 0) {
       const partnerVerifyKey = base58.decode(order.partnerPublicKey);
 
       const isValidPartnerSig = nacl.sign.detached.verify(

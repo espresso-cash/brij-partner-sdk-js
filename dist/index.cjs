@@ -6503,14 +6503,14 @@ class BrijPartnerClient {
     }
     async processOrder(order) {
         const decryptedOrder = order;
-        if (order.userSignature) {
+        if (order.userSignature && order.userSignature.length > 0) {
             const userVerifyKey = base58__default.default.decode(order.userPublicKey);
             const isValidUserSig = nacl__default.default.sign.detached.verify(order.userPayload, order.userSignature, userVerifyKey);
             if (!isValidUserSig) {
                 throw new Error("Invalid user signature");
             }
         }
-        if (order.partnerSignature) {
+        if (order.partnerSignature && order.partnerSignature.length > 0) {
             const partnerVerifyKey = base58__default.default.decode(order.partnerPublicKey);
             const isValidPartnerSig = nacl__default.default.sign.detached.verify(order.partnerPayload, order.partnerSignature, partnerVerifyKey);
             if (!isValidPartnerSig) {
